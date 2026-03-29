@@ -1,4 +1,4 @@
-package com.watch.music163;
+package com.qinghe.music163pro;
 
 import java.io.Serializable;
 

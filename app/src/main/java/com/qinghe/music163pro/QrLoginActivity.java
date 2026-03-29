@@ -1,4 +1,4 @@
-package com.watch.music163;
+package com.qinghe.music163pro;
 
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -148,8 +148,12 @@ public class QrLoginActivity extends AppCompatActivity {
                             break;
                         case 803:
                             // Login successful!
-                            tvStatus.setText("登录成功!");
                             stopPolling();
+                            if (cookie == null || cookie.isEmpty()) {
+                                tvStatus.setText("登录成功但未获取到Cookie");
+                                break;
+                            }
+                            tvStatus.setText("登录成功!");
                             saveCookie(cookie);
                             Toast.makeText(QrLoginActivity.this,
                                     "登录成功，Cookie已保存", Toast.LENGTH_LONG).show();

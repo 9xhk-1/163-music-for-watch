@@ -1,4 +1,4 @@
-package com.watch.music163;
+package com.qinghe.music163pro;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -39,6 +39,10 @@ public class SettingsActivity extends AppCompatActivity {
 
         btnSave.setOnClickListener(v -> {
             String cookie = etCookie.getText().toString().trim();
+            if (cookie.isEmpty()) {
+                Toast.makeText(this, "Cookie为空，未保存", Toast.LENGTH_SHORT).show();
+                return;
+            }
             prefs.edit().putString("cookie", cookie).apply();
             playerManager.setCookie(cookie);
             Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();

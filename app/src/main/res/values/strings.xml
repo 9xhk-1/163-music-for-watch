@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">云音乐</string>
+    <string name="app_name">163音乐Pro</string>
     <string name="search_hint">搜索歌曲</string>
     <string name="search">搜索</string>
     <string name="favorites">收藏</string>

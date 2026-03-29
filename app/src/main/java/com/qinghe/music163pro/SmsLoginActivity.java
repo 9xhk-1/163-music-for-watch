@@ -1,4 +1,4 @@
-package com.watch.music163;
+package com.qinghe.music163pro;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -119,6 +119,11 @@ public class SmsLoginActivity extends AppCompatActivity {
                     @Override
                     public void onResult(int resultCode, String message, String cookie) {
                         if (resultCode == 200) {
+                            if (cookie == null || cookie.isEmpty()) {
+                                tvStatus.setText("登录成功但未获取到Cookie");
+                                btnLogin.setEnabled(true);
+                                return;
+                            }
                             tvStatus.setText("登录成功!");
                             saveCookie(cookie);
                             Toast.makeText(SmsLoginActivity.this,
