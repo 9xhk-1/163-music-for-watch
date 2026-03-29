@@ -2,10 +2,9 @@ package com.watch.music163;
 
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Base64;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -14,10 +13,10 @@ import androidx.appcompat.app.AppCompatActivity;
 
 /**
  * QR Code Login Activity.
- * Implements the same login flow as yumbo-music-utils:
- * 1. /login/qr/key - get unikey
- * 2. /login/qr/create - create QR code image
- * 3. /login/qr/check - poll for scan status
+ * Implements the login flow by calling NetEase APIs directly:
+ * 1. /api/login/qrcode/unikey (weapi) - get unikey
+ * 2. Build QR URL locally: https://music.163.com/login?codekey=KEY
+ * 3. /api/login/qrcode/client/login (weapi) - poll for scan status
  */
 public class QrLoginActivity extends AppCompatActivity {
 
@@ -55,14 +54,19 @@ public class QrLoginActivity extends AppCompatActivity {
             @Override
             public void onResult(String key) {
                 qrKey = key;
-                // Step 2: Create QR code
+                // Step 2: Build QR URL and generate QR image locally
                 MusicApiHelper.loginQrCreate(key, new MusicApiHelper.QrCreateCallback() {
                     @Override
-                    public void onResult(String qrUrl, String qrBase64) {
-                        displayQrCode(qrBase64);
-                        tvStatus.setText("请使用网易云音乐App扫码登录");
-                        // Step 3: Start polling
-                        startPolling();
+                    public void onResult(String qrUrl) {
+                        Bitmap qrBitmap = generateQrBitmap(qrUrl, 400);
+                        if (qrBitmap != null) {
+                            ivQrCode.setImageBitmap(qrBitmap);
+                            tvStatus.setText("请使用网易云音乐App扫码登录");
+                            // Step 3: Start polling
+                            startPolling();
+                        } else {
+                            tvStatus.setText("二维码生成失败");
+                        }
                     }
 
                     @Override
@@ -79,22 +83,35 @@ public class QrLoginActivity extends AppCompatActivity {
         });
     }
 
-    private void displayQrCode(String base64Img) {
+    /**
+     * Generate a simple QR code bitmap from a URL string.
+     * Uses a minimal QR code generation algorithm (no external library needed).
+     */
+    private Bitmap generateQrBitmap(String content, int size) {
         try {
-            // Remove data URI prefix if present
-            String base64Data = base64Img;
-            if (base64Data.contains(",")) {
-                base64Data = base64Data.substring(base64Data.indexOf(",") + 1);
+            // Use a simple encoding approach - encode content into a visual
+            // pattern that can be recognized by QR scanners
+            boolean[][] matrix = QrCodeGenerator.encode(content);
+            if (matrix == null) return null;
+
+            int matrixSize = matrix.length;
+            int cellSize = size / matrixSize;
+            int bitmapSize = cellSize * matrixSize;
+
+            Bitmap bitmap = Bitmap.createBitmap(bitmapSize, bitmapSize, Bitmap.Config.ARGB_8888);
+            for (int y = 0; y < matrixSize; y++) {
+                for (int x = 0; x < matrixSize; x++) {
+                    int color = matrix[y][x] ? Color.BLACK : Color.WHITE;
+                    for (int dy = 0; dy < cellSize; dy++) {
+                        for (int dx = 0; dx < cellSize; dx++) {
+                            bitmap.setPixel(x * cellSize + dx, y * cellSize + dy, color);
+                        }
+                    }
+                }
             }
-            byte[] decodedBytes = Base64.decode(base64Data, Base64.DEFAULT);
-            Bitmap bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
-            if (bitmap != null) {
-                ivQrCode.setImageBitmap(bitmap);
-            } else {
-                tvStatus.setText("二维码解析失败");
-            }
+            return bitmap;
         } catch (Exception e) {
-            tvStatus.setText("二维码显示失败: " + e.getMessage());
+            return null;
         }
     }
 

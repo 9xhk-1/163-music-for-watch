@@ -14,7 +14,6 @@ public class SettingsActivity extends AppCompatActivity {
     private static final String PREFS_NAME = "music163_settings";
 
     private EditText etCookie;
-    private EditText etApiServer;
     private TextView btnPlayMode;
     private SharedPreferences prefs;
     private MusicPlayerManager playerManager;
@@ -28,40 +27,25 @@ public class SettingsActivity extends AppCompatActivity {
         playerManager = MusicPlayerManager.getInstance();
 
         etCookie = findViewById(R.id.et_cookie);
-        etApiServer = findViewById(R.id.et_api_server);
         TextView btnSave = findViewById(R.id.btn_save_cookie);
         TextView btnQrLogin = findViewById(R.id.btn_qr_login);
         btnPlayMode = findViewById(R.id.btn_play_mode);
 
         // Load saved values
         etCookie.setText(prefs.getString("cookie", ""));
-        etApiServer.setText(prefs.getString("api_server", ""));
 
         updatePlayModeText();
 
         btnSave.setOnClickListener(v -> {
             String cookie = etCookie.getText().toString().trim();
-            String apiServer = etApiServer.getText().toString().trim();
-            prefs.edit()
-                    .putString("cookie", cookie)
-                    .putString("api_server", apiServer)
-                    .apply();
+            prefs.edit().putString("cookie", cookie).apply();
             playerManager.setCookie(cookie);
-            MusicApiHelper.setApiServerUrl(apiServer);
             Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
         });
 
-        btnQrLogin.setOnClickListener(v -> {
-            String apiServer = etApiServer.getText().toString().trim();
-            if (apiServer.isEmpty()) {
-                Toast.makeText(this, "请先填写API服务器地址", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            // Save server URL first
-            prefs.edit().putString("api_server", apiServer).apply();
-            MusicApiHelper.setApiServerUrl(apiServer);
-            startActivity(new Intent(this, QrLoginActivity.class));
-        });
+        btnQrLogin.setOnClickListener(v ->
+            startActivity(new Intent(this, QrLoginActivity.class))
+        );
 
         btnPlayMode.setOnClickListener(v -> cyclePlayMode());
     }

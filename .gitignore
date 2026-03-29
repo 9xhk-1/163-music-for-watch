@@ -12,3 +12,4 @@ local.properties
 *.apk
 *.ap_
 *.aab
+*.class

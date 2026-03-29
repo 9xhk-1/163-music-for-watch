@@ -21,28 +21,6 @@
             android:gravity="center"
             android:paddingBottom="8dp" />
 
-        <!-- API Server URL -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/api_server_label"
-            android:textColor="@color/gray_text"
-            android:textSize="12sp"
-            android:paddingBottom="2dp" />
-
-        <EditText
-            android:id="@+id/et_api_server"
-            android:layout_width="match_parent"
-            android:layout_height="36dp"
-            android:background="@color/gray_light"
-            android:hint="@string/api_server_hint"
-            android:inputType="textUri"
-            android:padding="8dp"
-            android:singleLine="true"
-            android:textColor="@color/black"
-            android:textColorHint="@color/gray_text"
-            android:textSize="11sp" />
-
         <!-- Cookie -->
         <TextView
             android:layout_width="match_parent"
@@ -50,7 +28,6 @@
             android:text="Cookie"
             android:textColor="@color/gray_text"
             android:textSize="12sp"
-            android:paddingTop="6dp"
             android:paddingBottom="2dp" />
 
         <EditText
@@ -74,7 +51,7 @@
             android:layout_marginTop="6dp"
             android:background="@color/colorPrimary"
             android:gravity="center"
-            android:text="@string/save_settings"
+            android:text="@string/save_cookie"
             android:textColor="@color/white"
             android:textSize="14sp"
             android:clickable="true"

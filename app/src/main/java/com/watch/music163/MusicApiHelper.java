@@ -15,48 +15,31 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Music API helper using NeteaseCloudMusicApi server endpoints
- * (same API pattern as yumbo-music-utils library).
- * Requires a NeteaseCloudMusicApi server to be running.
- * Falls back to direct NetEase APIs if no server is configured.
+ * Music API helper that calls NetEase Cloud Music APIs directly
+ * using weapi encryption (ported from NeteaseCloudMusicApiBackup).
+ * No external API server needed.
  */
 public class MusicApiHelper {
 
     private static final String TAG = "MusicApiHelper";
 
+    private static final String WEAPI_BASE = "https://music.163.com/weapi";
+    private static final String DOMAIN = "https://music.163.com";
+
     private static final String USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-    private static final String REFERER = "https://music.163.com";
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0";
 
     private static final int CONNECT_TIMEOUT_MS = 15000;
     private static final int READ_TIMEOUT_MS = 15000;
 
     private static final ExecutorService executor = Executors.newCachedThreadPool();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
-
-    // Configurable API server URL (NeteaseCloudMusicApi server)
-    private static String apiServerUrl = "";
-
-    public static void setApiServerUrl(String url) {
-        if (url != null) {
-            apiServerUrl = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-        } else {
-            apiServerUrl = "";
-        }
-    }
-
-    public static String getApiServerUrl() {
-        return apiServerUrl;
-    }
-
-    private static boolean hasApiServer() {
-        return apiServerUrl != null && !apiServerUrl.isEmpty();
-    }
 
     public interface SearchCallback {
         void onResult(List<Song> songs);
@@ -74,7 +57,8 @@ public class MusicApiHelper {
     }
 
     public interface QrCreateCallback {
-        void onResult(String qrUrl, String qrBase64);
+        /** Returns the QR URL (to be encoded as QR image by the caller) */
+        void onResult(String qrUrl);
         void onError(String message);
     }
 
@@ -88,12 +72,7 @@ public class MusicApiHelper {
     public static void searchSongs(String keyword, String cookie, SearchCallback callback) {
         executor.execute(() -> {
             try {
-                List<Song> songs;
-                if (hasApiServer()) {
-                    songs = searchViaApiServer(keyword, cookie);
-                } else {
-                    songs = searchViaDirect(keyword, cookie);
-                }
+                List<Song> songs = searchDirect(keyword, cookie);
                 mainHandler.post(() -> callback.onResult(songs));
             } catch (Exception e) {
                 Log.w(TAG, "Search error", e);
@@ -102,21 +81,22 @@ public class MusicApiHelper {
         });
     }
 
-    private static List<Song> searchViaApiServer(String keyword, String cookie) throws Exception {
-        String encoded = URLEncoder.encode(keyword, "UTF-8");
-        long ts = System.currentTimeMillis();
-        String apiUrl = apiServerUrl + "/cloudsearch?keywords=" + encoded
-                + "&limit=20&type=1&timestamp=" + ts;
-        String response = httpGet(apiUrl, cookie);
-        return parseCloudsearchResult(response);
-    }
+    /**
+     * Search via weapi/cloudsearch/pc (same as NeteaseCloudMusicApiBackup module/cloudsearch.js)
+     */
+    private static List<Song> searchDirect(String keyword, String cookie) throws Exception {
+        JSONObject data = new JSONObject();
+        data.put("s", keyword);
+        data.put("type", 1);      // 1 = songs
+        data.put("limit", 20);
+        data.put("offset", 0);
+        data.put("total", true);
 
-    private static List<Song> searchViaDirect(String keyword, String cookie) throws Exception {
-        String encoded = URLEncoder.encode(keyword, "UTF-8");
-        String apiUrl = "https://music.163.com/api/search/get/web?s=" + encoded
-                + "&type=1&offset=0&total=true&limit=20";
-        String response = httpGet(apiUrl, cookie);
-        return parseDirectSearchResult(response);
+        String csrfToken = extractCsrfToken(cookie);
+        data.put("csrf_token", csrfToken);
+
+        String response = weapiPost("/api/cloudsearch/pc", data.toString(), cookie);
+        return parseCloudsearchResult(response);
     }
 
     private static List<Song> parseCloudsearchResult(String response) throws Exception {
@@ -131,56 +111,16 @@ public class MusicApiHelper {
                     long id = s.getLong("id");
                     String name = s.getString("name");
                     String artist = "";
-                    // cloudsearch uses "ar" instead of "artists"
+                    // cloudsearch uses "ar" for artists
                     JSONArray ar = s.optJSONArray("ar");
                     if (ar != null && ar.length() > 0) {
                         artist = ar.getJSONObject(0).optString("name", "");
                     }
-                    if (artist.isEmpty()) {
-                        JSONArray artists = s.optJSONArray("artists");
-                        if (artists != null && artists.length() > 0) {
-                            artist = artists.getJSONObject(0).optString("name", "");
-                        }
-                    }
                     String album = "";
-                    // cloudsearch uses "al" instead of "album"
+                    // cloudsearch uses "al" for album
                     JSONObject al = s.optJSONObject("al");
                     if (al != null) {
                         album = al.optString("name", "");
-                    }
-                    if (album.isEmpty()) {
-                        JSONObject albumObj = s.optJSONObject("album");
-                        if (albumObj != null) {
-                            album = albumObj.optString("name", "");
-                        }
-                    }
-                    songs.add(new Song(id, name, artist, album));
-                }
-            }
-        }
-        return songs;
-    }
-
-    private static List<Song> parseDirectSearchResult(String response) throws Exception {
-        JSONObject json = new JSONObject(response);
-        List<Song> songs = new ArrayList<>();
-        JSONObject result = json.optJSONObject("result");
-        if (result != null) {
-            JSONArray songsArray = result.optJSONArray("songs");
-            if (songsArray != null) {
-                for (int i = 0; i < songsArray.length(); i++) {
-                    JSONObject s = songsArray.getJSONObject(i);
-                    long id = s.getLong("id");
-                    String name = s.getString("name");
-                    String artist = "";
-                    JSONArray artists = s.optJSONArray("artists");
-                    if (artists != null && artists.length() > 0) {
-                        artist = artists.getJSONObject(0).optString("name", "");
-                    }
-                    String album = "";
-                    JSONObject albumObj = s.optJSONObject("album");
-                    if (albumObj != null) {
-                        album = albumObj.optString("name", "");
                     }
                     songs.add(new Song(id, name, artist, album));
                 }
@@ -200,31 +140,28 @@ public class MusicApiHelper {
             try {
                 String url = null;
 
-                // Try API server first (supports VIP with proper cookie)
-                if (hasApiServer()) {
+                // Try weapi with VIP quality levels
+                if (tryVip && cookie != null && !cookie.isEmpty()) {
                     try {
-                        url = getSongUrlViaApiServer(songId, cookie, "exhigh");
+                        url = fetchSongUrlWeapi(songId, cookie, "exhigh");
                     } catch (Exception e) {
-                        Log.w(TAG, "API server exhigh failed", e);
+                        Log.w(TAG, "weapi exhigh failed", e);
                     }
                     if (url == null) {
                         try {
-                            url = getSongUrlViaApiServer(songId, cookie, "standard");
+                            url = fetchSongUrlWeapi(songId, cookie, "standard");
                         } catch (Exception e) {
-                            Log.w(TAG, "API server standard failed", e);
+                            Log.w(TAG, "weapi standard failed", e);
                         }
                     }
                 }
 
-                // Fallback: try direct NetEase API (free endpoint)
+                // Fallback: weapi without VIP
                 if (url == null) {
                     try {
-                        String apiUrl = "https://music.163.com/api/song/enhance/player/url?ids=["
-                                + songId + "]&br=320000";
-                        String response = httpGet(apiUrl, null);
-                        url = extractUrlFromDirectResponse(response);
+                        url = fetchSongUrlWeapi(songId, cookie, "standard");
                     } catch (Exception e) {
-                        Log.w(TAG, "Direct API free failed", e);
+                        Log.w(TAG, "weapi standard (no-vip) failed", e);
                     }
                 }
 
@@ -241,12 +178,24 @@ public class MusicApiHelper {
         });
     }
 
-    private static String getSongUrlViaApiServer(long songId, String cookie, String level)
+    /**
+     * Fetch song URL via weapi (same as NeteaseCloudMusicApiBackup module/song_url_v1.js)
+     */
+    private static String fetchSongUrlWeapi(long songId, String cookie, String level)
             throws Exception {
-        long ts = System.currentTimeMillis();
-        String apiUrl = apiServerUrl + "/song/url/v1?id=" + songId
-                + "&level=" + level + "&timestamp=" + ts;
-        String response = httpGet(apiUrl, cookie);
+        JSONObject data = new JSONObject();
+        data.put("ids", "[" + songId + "]");
+        data.put("level", level);
+        data.put("encodeType", "flac");
+
+        String csrfToken = extractCsrfToken(cookie);
+        data.put("csrf_token", csrfToken);
+
+        String response = weapiPost("/api/song/enhance/player/url/v1", data.toString(), cookie);
+        return extractSongUrlFromResponse(response);
+    }
+
+    private static String extractSongUrlFromResponse(String response) throws Exception {
         JSONObject json = new JSONObject(response);
         JSONArray data = json.optJSONArray("data");
         if (data != null && data.length() > 0) {
@@ -262,51 +211,27 @@ public class MusicApiHelper {
         return null;
     }
 
-    private static String extractUrlFromDirectResponse(String response) throws Exception {
-        JSONObject json = new JSONObject(response);
-        JSONArray data = json.optJSONArray("data");
-        if (data != null && data.length() > 0) {
-            JSONObject first = data.getJSONObject(0);
-            int code = first.optInt("code", -1);
-            if (code != 200) {
-                return null;
-            }
-            String url = first.optString("url", null);
-            if (url != null && !"null".equals(url) && !url.isEmpty()) {
-                return url;
-            }
-        }
-        return null;
-    }
-
     // ==================== QR Login ====================
 
     /**
-     * Step 1: Get QR login key
+     * Step 1: Get QR login key via weapi
+     * (same as NeteaseCloudMusicApiBackup module/login_qr_key.js)
      */
     public static void loginQrKey(QrKeyCallback callback) {
         executor.execute(() -> {
             try {
-                if (!hasApiServer()) {
-                    mainHandler.post(() -> callback.onError("请先设置API服务器地址"));
-                    return;
-                }
-                long ts = System.currentTimeMillis();
-                String apiUrl = apiServerUrl + "/login/qr/key?timestamp=" + ts;
-                String response = httpGet(apiUrl, null);
+                JSONObject data = new JSONObject();
+                data.put("type", 3);
+
+                String response = weapiPost("/api/login/qrcode/unikey", data.toString(), null);
                 JSONObject json = new JSONObject(response);
                 int code = json.optInt("code", -1);
-                if (code == 200) {
-                    JSONObject data = json.optJSONObject("data");
-                    if (data != null) {
-                        String unikey = data.optString("unikey", "");
-                        if (!unikey.isEmpty()) {
-                            mainHandler.post(() -> callback.onResult(unikey));
-                            return;
-                        }
-                    }
+                String unikey = json.optString("unikey", "");
+                if (code == 200 && !unikey.isEmpty()) {
+                    mainHandler.post(() -> callback.onResult(unikey));
+                } else {
+                    mainHandler.post(() -> callback.onError("获取二维码Key失败: code=" + code));
                 }
-                mainHandler.post(() -> callback.onError("获取二维码Key失败"));
             } catch (Exception e) {
                 mainHandler.post(() -> callback.onError(e.getMessage()));
             }
@@ -314,118 +239,116 @@ public class MusicApiHelper {
     }
 
     /**
-     * Step 2: Create QR code image
+     * Step 2: Build QR URL from key (no server call needed)
+     * (same as NeteaseCloudMusicApiBackup module/login_qr_create.js)
      */
     public static void loginQrCreate(String key, QrCreateCallback callback) {
-        executor.execute(() -> {
-            try {
-                if (!hasApiServer()) {
-                    mainHandler.post(() -> callback.onError("请先设置API服务器地址"));
-                    return;
-                }
-                long ts = System.currentTimeMillis();
-                String encodedKey = URLEncoder.encode(key, "UTF-8");
-                String apiUrl = apiServerUrl + "/login/qr/create?key=" + encodedKey
-                        + "&qrimg=true&timestamp=" + ts;
-                String response = httpGet(apiUrl, null);
-                JSONObject json = new JSONObject(response);
-                int code = json.optInt("code", -1);
-                if (code == 200) {
-                    JSONObject data = json.optJSONObject("data");
-                    if (data != null) {
-                        String qrUrl = data.optString("qrurl", "");
-                        String qrImg = data.optString("qrimg", "");
-                        mainHandler.post(() -> callback.onResult(qrUrl, qrImg));
-                        return;
-                    }
-                }
-                mainHandler.post(() -> callback.onError("创建二维码失败"));
-            } catch (Exception e) {
-                mainHandler.post(() -> callback.onError(e.getMessage()));
-            }
-        });
+        String qrUrl = "https://music.163.com/login?codekey=" + key;
+        mainHandler.post(() -> callback.onResult(qrUrl));
     }
 
     /**
-     * Step 3: Check QR login status (poll this)
-     * code: 801=waiting, 802=scanned waiting confirm, 803=authorized
+     * Step 3: Check QR login status via weapi
+     * (same as NeteaseCloudMusicApiBackup module/login_qr_check.js)
+     * Captures Set-Cookie headers to build the cookie string.
      */
     public static void loginQrCheck(String key, QrCheckCallback callback) {
         executor.execute(() -> {
             try {
-                if (!hasApiServer()) {
-                    mainHandler.post(() -> callback.onError("请先设置API服务器地址"));
-                    return;
+                JSONObject data = new JSONObject();
+                data.put("key", key);
+                data.put("type", 3);
+
+                String[] encrypted = NeteaseApiCrypto.weapi(data.toString());
+
+                String postBody = "params=" + URLEncoder.encode(encrypted[0], "UTF-8")
+                        + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
+
+                String urlStr = WEAPI_BASE + "/login/qrcode/client/login";
+                URL url = new URL(urlStr);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("User-Agent", USER_AGENT);
+                conn.setRequestProperty("Referer", DOMAIN);
+                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                conn.setReadTimeout(READ_TIMEOUT_MS);
+                conn.setDoOutput(true);
+                conn.setInstanceFollowRedirects(false);
+
+                try {
+                    OutputStream os = conn.getOutputStream();
+                    os.write(postBody.getBytes("UTF-8"));
+                    os.close();
+
+                    // Read response body
+                    BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    reader.close();
+
+                    JSONObject json = new JSONObject(sb.toString());
+                    int code = json.optInt("code", -1);
+                    String message = json.optString("message", "");
+
+                    // Extract cookies from Set-Cookie headers
+                    String cookieStr = "";
+                    if (code == 803) {
+                        cookieStr = extractSetCookies(conn);
+                    }
+
+                    final String finalCookie = cookieStr;
+                    mainHandler.post(() -> callback.onResult(code, message, finalCookie));
+                } finally {
+                    conn.disconnect();
                 }
-                long ts = System.currentTimeMillis();
-                String encodedKey = URLEncoder.encode(key, "UTF-8");
-                String apiUrl = apiServerUrl + "/login/qr/check?key=" + encodedKey
-                        + "&timestamp=" + ts + "&noCookie=true";
-                String response = httpGet(apiUrl, null);
-                JSONObject json = new JSONObject(response);
-                int code = json.optInt("code", -1);
-                String message = json.optString("message", "");
-                String cookie = json.optString("cookie", "");
-                mainHandler.post(() -> callback.onResult(code, message, cookie));
             } catch (Exception e) {
                 mainHandler.post(() -> callback.onError(e.getMessage()));
             }
         });
     }
 
-    // ==================== HTTP Methods ====================
+    // ==================== weapi POST ====================
 
-    private static String httpGet(String urlStr, String cookie) throws Exception {
-        URL url = new URL(urlStr);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("GET");
-        conn.setRequestProperty("User-Agent", USER_AGENT);
-        conn.setRequestProperty("Referer", REFERER);
-        if (cookie != null && !cookie.isEmpty()) {
-            conn.setRequestProperty("Cookie", cookie);
-        }
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
-        conn.setInstanceFollowRedirects(true);
-        try {
-            int responseCode = conn.getResponseCode();
-            BufferedReader reader;
-            if (responseCode >= 200 && responseCode < 400) {
-                reader = new BufferedReader(
-                        new InputStreamReader(conn.getInputStream(), "UTF-8"));
-            } else {
-                reader = new BufferedReader(
-                        new InputStreamReader(conn.getErrorStream(), "UTF-8"));
-            }
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-            reader.close();
-            return sb.toString();
-        } finally {
-            conn.disconnect();
-        }
-    }
+    /**
+     * Send a weapi-encrypted POST request to NetEase.
+     * @param apiPath The API path (e.g. "/api/cloudsearch/pc")
+     * @param jsonData The JSON data to encrypt
+     * @param cookie The user cookie string (can be null)
+     * @return The response body as string
+     */
+    private static String weapiPost(String apiPath, String jsonData, String cookie) throws Exception {
+        String[] encrypted = NeteaseApiCrypto.weapi(jsonData);
 
-    private static String httpPost(String urlStr, String jsonBody, String cookie) throws Exception {
+        String postBody = "params=" + URLEncoder.encode(encrypted[0], "UTF-8")
+                + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
+
+        // weapi URL: replace /api/ with /weapi/
+        String weapiPath = apiPath.replaceFirst("^/api/", "/weapi/");
+        String urlStr = DOMAIN + weapiPath;
+
         URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("User-Agent", USER_AGENT);
-        conn.setRequestProperty("Referer", REFERER);
-        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("Referer", DOMAIN);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         if (cookie != null && !cookie.isEmpty()) {
             conn.setRequestProperty("Cookie", cookie);
         }
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
         conn.setReadTimeout(READ_TIMEOUT_MS);
         conn.setDoOutput(true);
+
         try {
             OutputStream os = conn.getOutputStream();
-            os.write(jsonBody.getBytes("UTF-8"));
+            os.write(postBody.getBytes("UTF-8"));
             os.close();
+
             int responseCode = conn.getResponseCode();
             BufferedReader reader;
             if (responseCode >= 200 && responseCode < 400) {
@@ -445,5 +368,47 @@ public class MusicApiHelper {
         } finally {
             conn.disconnect();
         }
+    }
+
+    // ==================== Utility ====================
+
+    /**
+     * Extract __csrf token from cookie string
+     */
+    private static String extractCsrfToken(String cookie) {
+        if (cookie == null || cookie.isEmpty()) return "";
+        String[] parts = cookie.split(";");
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (trimmed.startsWith("__csrf=")) {
+                return trimmed.substring("__csrf=".length());
+            }
+        }
+        return "";
+    }
+
+    /**
+     * Extract Set-Cookie headers and build a simplified cookie string
+     * containing the important values (MUSIC_U, __csrf, etc.)
+     */
+    private static String extractSetCookies(HttpURLConnection conn) {
+        StringBuilder cookieBuilder = new StringBuilder();
+        Map<String, List<String>> headers = conn.getHeaderFields();
+        List<String> setCookies = headers.get("Set-Cookie");
+        if (setCookies == null) {
+            setCookies = headers.get("set-cookie");
+        }
+        if (setCookies != null) {
+            for (String setCookie : setCookies) {
+                // Each Set-Cookie contains "name=value; path=...; ..."
+                // Extract just the name=value part
+                String nameValue = setCookie.split(";")[0].trim();
+                if (cookieBuilder.length() > 0) {
+                    cookieBuilder.append("; ");
+                }
+                cookieBuilder.append(nameValue);
+            }
+        }
+        return cookieBuilder.toString();
     }
 }
