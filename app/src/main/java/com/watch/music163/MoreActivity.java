@@ -32,6 +32,7 @@ public class MoreActivity extends AppCompatActivity {
     private ArrayAdapter<Song> adapter;
     private ArrayAdapter<String> historyAdapter;
     private final List<Song> displayList = new ArrayList<>();
+    private final List<Song> searchResults = new ArrayList<>();
     private final List<String> historyList = new ArrayList<>();
     private boolean showingFavorites = false;
     private FavoritesManager favoritesManager;
@@ -118,6 +119,8 @@ public class MoreActivity extends AppCompatActivity {
         MusicApiHelper.searchSongs(keyword, cookie, new MusicApiHelper.SearchCallback() {
             @Override
             public void onResult(List<Song> songs) {
+                searchResults.clear();
+                searchResults.addAll(songs);
                 displayList.clear();
                 displayList.addAll(songs);
                 adapter.notifyDataSetChanged();
@@ -141,6 +144,9 @@ public class MoreActivity extends AppCompatActivity {
         tabSearch.setTextColor(getResources().getColor(R.color.white, getTheme()));
         tabFavorites.setBackgroundColor(getResources().getColor(R.color.bg_dark, getTheme()));
         tabFavorites.setTextColor(getResources().getColor(R.color.gray_text, getTheme()));
+        displayList.clear();
+        displayList.addAll(searchResults);
+        adapter.notifyDataSetChanged();
         updateHistoryVisibility();
     }
 

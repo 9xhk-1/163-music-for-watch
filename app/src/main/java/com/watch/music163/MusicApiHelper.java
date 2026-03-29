@@ -81,24 +81,44 @@ public class MusicApiHelper {
     }
 
     public static void getSongUrl(long songId, String cookie, UrlCallback callback) {
+        getSongUrl(songId, cookie, true, callback);
+    }
+
+    public static void getSongUrl(long songId, String cookie, boolean tryVip, UrlCallback callback) {
         executor.execute(() -> {
             try {
                 String url = null;
 
                 // Try VIP endpoint with POST if cookie is available
-                if (cookie != null && !cookie.isEmpty()) {
+                if (tryVip && cookie != null && !cookie.isEmpty()) {
                     url = fetchSongUrlWithPost(songId, cookie, "exhigh");
                     if (url == null) {
                         url = fetchSongUrlWithPost(songId, cookie, "standard");
                     }
                 }
 
-                // Fallback to free endpoint
+                // Fallback to free endpoint with cookie
                 if (url == null) {
-                    String apiUrl = "https://music.163.com/api/song/enhance/player/url?ids=["
-                            + songId + "]&br=320000";
-                    String response = httpGet(apiUrl, cookie);
-                    url = extractUrlFromResponse(response);
+                    try {
+                        String apiUrl = "https://music.163.com/api/song/enhance/player/url?ids=["
+                                + songId + "]&br=320000";
+                        String response = httpGet(apiUrl, cookie);
+                        url = extractUrlFromResponse(response);
+                    } catch (Exception e) {
+                        // ignore, try next fallback
+                    }
+                }
+
+                // Fallback to free endpoint without cookie
+                if (url == null && cookie != null && !cookie.isEmpty()) {
+                    try {
+                        String apiUrl = "https://music.163.com/api/song/enhance/player/url?ids=["
+                                + songId + "]&br=320000";
+                        String response = httpGet(apiUrl, null);
+                        url = extractUrlFromResponse(response);
+                    } catch (Exception e) {
+                        // ignore, try next fallback
+                    }
                 }
 
                 // Last resort: direct link
@@ -131,6 +151,10 @@ public class MusicApiHelper {
         JSONArray data = json.optJSONArray("data");
         if (data != null && data.length() > 0) {
             JSONObject first = data.getJSONObject(0);
+            int code = first.optInt("code", -1);
+            if (code != 200) {
+                return null;
+            }
             String url = first.optString("url", null);
             if (url != null && !"null".equals(url) && !url.isEmpty()) {
                 return url;

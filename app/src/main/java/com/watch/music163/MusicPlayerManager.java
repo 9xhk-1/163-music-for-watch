@@ -81,7 +81,35 @@ public class MusicPlayerManager {
             mediaPlayer.setOnErrorListener((mp, what, extra) -> {
                 isPlaying = false;
                 notifyPlayStateChanged(false);
-                if (callback != null) {
+                Song song = getCurrentSong();
+                if (song != null) {
+                    song.setUrl(null);
+                }
+                // If cookie was used, retry fetching URL without VIP endpoints
+                String cookie = getCookie();
+                if (cookie != null && !cookie.isEmpty() && song != null) {
+                    MusicApiHelper.getSongUrl(song.getId(), cookie, false,
+                            new MusicApiHelper.UrlCallback() {
+                                @Override
+                                public void onResult(String retryUrl) {
+                                    if (retryUrl != null && !retryUrl.equals(url)) {
+                                        song.setUrl(retryUrl);
+                                        play(retryUrl);
+                                    } else if (callback != null) {
+                                        mainHandler.post(() -> callback.onError(
+                                                "Playback error: " + what));
+                                    }
+                                }
+
+                                @Override
+                                public void onError(String message) {
+                                    if (callback != null) {
+                                        mainHandler.post(() -> callback.onError(
+                                                "Playback error: " + what));
+                                    }
+                                }
+                            });
+                } else if (callback != null) {
                     mainHandler.post(() -> callback.onError("Playback error: " + what));
                 }
                 return true;
