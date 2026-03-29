@@ -88,7 +88,8 @@ public class MusicPlayerManager {
                 // If cookie was used, retry fetching URL without VIP endpoints
                 String cookie = getCookie();
                 if (cookie != null && !cookie.isEmpty() && song != null) {
-                    MusicApiHelper.getSongUrl(song.getId(), cookie, false,
+                    boolean tryVip = false;
+                    MusicApiHelper.getSongUrl(song.getId(), cookie, tryVip,
                             new MusicApiHelper.UrlCallback() {
                                 @Override
                                 public void onResult(String retryUrl) {
