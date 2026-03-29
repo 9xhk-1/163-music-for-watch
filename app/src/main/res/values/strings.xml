@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">云音乐</string>
+    <string name="search_hint">搜索歌曲</string>
+    <string name="search">搜索</string>
+    <string name="favorites">收藏</string>
+    <string name="settings">设置</string>
+    <string name="save_cookie">保存Cookie</string>
+    <string name="cookie_hint">请输入网易云音乐Cookie</string>
+    <string name="cloud_favorites">登录后使用云端收藏</string>
+    <string name="no_song">暂无歌曲</string>
+    <string name="more">更多</string>
+</resources>

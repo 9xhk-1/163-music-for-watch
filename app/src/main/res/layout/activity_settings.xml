@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:paddingBottom="8dp" />
+
+    <EditText
+        android:id="@+id/et_cookie"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:background="@color/gray_light"
+        android:gravity="top|start"
+        android:hint="@string/cookie_hint"
+        android:inputType="textMultiLine"
+        android:padding="8dp"
+        android:textColor="@color/black"
+        android:textColorHint="@color/gray_text"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/btn_save_cookie"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginTop="8dp"
+        android:background="@color/colorPrimary"
+        android:gravity="center"
+        android:text="@string/save_cookie"
+        android:textColor="@color/white"
+        android:textSize="14sp"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <CheckBox
+        android:id="@+id/cb_cloud_favorites"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/cloud_favorites"
+        android:textColor="@color/white"
+        android:textSize="13sp"
+        android:buttonTint="@color/colorAccent" />
+</LinearLayout>
