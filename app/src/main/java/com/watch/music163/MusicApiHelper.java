@@ -42,7 +42,20 @@ public class MusicApiHelper {
     private static final String VERSION_CODE = "140";
     private static final String CHANNEL = "distribution";
     private static final String OS_TYPE = "iPhone OS";
-    private static final String DEVICE_ID = UUID.randomUUID().toString().replace("-", "");
+    private static String deviceId = UUID.randomUUID().toString().replace("-", "");
+
+    /**
+     * Set a persistent device ID (should be called at app startup from SharedPreferences).
+     */
+    public static void setDeviceId(String id) {
+        if (id != null && !id.isEmpty()) {
+            deviceId = id;
+        }
+    }
+
+    public static String getDeviceId() {
+        return deviceId;
+    }
 
     private static final int CONNECT_TIMEOUT_MS = 15000;
     private static final int READ_TIMEOUT_MS = 15000;
@@ -505,7 +518,7 @@ public class MusicApiHelper {
         sb.append("ntes_kaola_ad=1; ");
         sb.append("WEVNSM=1.0.0; ");
         sb.append("osver=").append(URLEncoder_safe(OS_VER)).append("; ");
-        sb.append("deviceId=").append(DEVICE_ID).append("; ");
+        sb.append("deviceId=").append(deviceId).append("; ");
         sb.append("os=").append(URLEncoder_safe(OS_TYPE)).append("; ");
         sb.append("channel=").append(CHANNEL).append("; ");
         sb.append("appver=").append(APP_VER);

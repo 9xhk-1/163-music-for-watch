@@ -63,6 +63,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String cookie = prefs.getString("cookie", "");
         playerManager.setCookie(cookie);
 
+        // Load or generate persistent device ID
+        String savedDeviceId = prefs.getString("device_id", "");
+        if (savedDeviceId.isEmpty()) {
+            savedDeviceId = MusicApiHelper.getDeviceId();
+            prefs.edit().putString("device_id", savedDeviceId).apply();
+        }
+        MusicApiHelper.setDeviceId(savedDeviceId);
+
         // Load saved play mode
         String playModeStr = prefs.getString("play_mode", "LIST_LOOP");
         try {

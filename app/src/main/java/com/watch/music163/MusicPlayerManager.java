@@ -32,6 +32,7 @@ public class MusicPlayerManager {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private PlayMode playMode = PlayMode.LIST_LOOP;
     private final Random random = new Random();
+    private long currentlyPlayingSongId = -1;
 
     private MusicPlayerManager() {}
 
@@ -302,7 +303,6 @@ public class MusicPlayerManager {
     }
 
     private String cookieValue = "";
-    private long currentlyPlayingSongId = -1;
 
     public void setCookie(String cookie) {
         this.cookieValue = cookie != null ? cookie : "";
