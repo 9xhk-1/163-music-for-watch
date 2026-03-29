@@ -8,70 +8,80 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
         android:orientation="vertical"
         android:padding="8dp">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/settings"
+            android:gravity="center"
+            android:text="@string/sms_login"
             android:textColor="@color/white"
             android:textSize="15sp"
             android:textStyle="bold"
-            android:gravity="center"
-            android:paddingBottom="4dp" />
+            android:paddingBottom="6dp" />
 
-        <!-- Cookie -->
+        <!-- Phone number -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Cookie"
+            android:text="@string/phone_label"
             android:textColor="@color/gray_text"
             android:textSize="11sp"
             android:paddingBottom="2dp" />
 
         <EditText
-            android:id="@+id/et_cookie"
+            android:id="@+id/et_phone"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="36dp"
             android:background="@color/gray_light"
-            android:gravity="top|start"
-            android:hint="@string/cookie_hint"
-            android:inputType="textMultiLine"
+            android:hint="@string/phone_hint"
+            android:inputType="phone"
             android:padding="6dp"
+            android:singleLine="true"
             android:textColor="@color/black"
             android:textColorHint="@color/gray_text"
-            android:textSize="10sp" />
+            android:textSize="13sp" />
 
-        <!-- Save button -->
+        <!-- Send code button -->
         <TextView
-            android:id="@+id/btn_save_cookie"
-            android:layout_width="match_parent"
-            android:layout_height="34dp"
-            android:layout_marginTop="4dp"
-            android:background="@color/colorPrimary"
-            android:gravity="center"
-            android:text="@string/save_cookie"
-            android:textColor="@color/white"
-            android:textSize="13sp"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <!-- QR Login button -->
-        <TextView
-            android:id="@+id/btn_qr_login"
+            android:id="@+id/btn_send_code"
             android:layout_width="match_parent"
             android:layout_height="34dp"
             android:layout_marginTop="4dp"
             android:background="@color/colorAccent"
             android:gravity="center"
-            android:text="@string/qr_login"
+            android:text="@string/send_code"
             android:textColor="@color/white"
             android:textSize="13sp"
             android:clickable="true"
             android:focusable="true" />
 
-        <!-- SMS Login button -->
+        <!-- Verification code -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/code_label"
+            android:textColor="@color/gray_text"
+            android:textSize="11sp"
+            android:paddingTop="6dp"
+            android:paddingBottom="2dp" />
+
+        <EditText
+            android:id="@+id/et_code"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:background="@color/gray_light"
+            android:hint="@string/code_hint"
+            android:inputType="number"
+            android:padding="6dp"
+            android:singleLine="true"
+            android:textColor="@color/black"
+            android:textColorHint="@color/gray_text"
+            android:textSize="13sp" />
+
+        <!-- Login button -->
         <TextView
             android:id="@+id/btn_sms_login"
             android:layout_width="match_parent"
@@ -79,25 +89,21 @@
             android:layout_marginTop="4dp"
             android:background="@color/colorPrimary"
             android:gravity="center"
-            android:text="@string/sms_login"
+            android:text="@string/login"
             android:textColor="@color/white"
             android:textSize="13sp"
             android:clickable="true"
             android:focusable="true" />
 
-        <!-- Play mode button -->
+        <!-- Status text -->
         <TextView
-            android:id="@+id/btn_play_mode"
+            android:id="@+id/tv_sms_status"
             android:layout_width="match_parent"
-            android:layout_height="34dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:background="@color/bg_dark"
             android:gravity="center"
-            android:text="@string/play_mode_list_loop"
-            android:textColor="@color/white"
-            android:textSize="12sp"
-            android:clickable="true"
-            android:focusable="true" />
+            android:textColor="@color/gray_text"
+            android:textSize="11sp" />
 
     </LinearLayout>
 </ScrollView>

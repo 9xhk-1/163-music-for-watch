@@ -167,6 +167,7 @@ public class MusicPlayerManager {
             }
             mediaPlayer = null;
             isPlaying = false;
+            currentlyPlayingSongId = -1;
         }
     }
 
@@ -267,8 +268,17 @@ public class MusicPlayerManager {
     public void playCurrent() {
         Song song = getCurrentSong();
         if (song == null) return;
+
+        // Only restart playback if the song is actually different from what's playing
+        if (currentlyPlayingSongId == song.getId() && isPlaying) {
+            // Same song is already playing, just notify UI without restarting
+            notifySongChanged(song);
+            return;
+        }
+
         notifySongChanged(song);
         if (song.getUrl() != null && !song.getUrl().isEmpty()) {
+            currentlyPlayingSongId = song.getId();
             play(song.getUrl());
         } else {
             // Need to fetch URL first
@@ -277,6 +287,7 @@ public class MusicPlayerManager {
                 @Override
                 public void onResult(String url) {
                     song.setUrl(url);
+                    currentlyPlayingSongId = song.getId();
                     play(url);
                 }
 
@@ -291,6 +302,7 @@ public class MusicPlayerManager {
     }
 
     private String cookieValue = "";
+    private long currentlyPlayingSongId = -1;
 
     public void setCookie(String cookie) {
         this.cookieValue = cookie != null ? cookie : "";

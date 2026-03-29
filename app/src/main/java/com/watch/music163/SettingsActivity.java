@@ -29,6 +29,7 @@ public class SettingsActivity extends AppCompatActivity {
         etCookie = findViewById(R.id.et_cookie);
         TextView btnSave = findViewById(R.id.btn_save_cookie);
         TextView btnQrLogin = findViewById(R.id.btn_qr_login);
+        TextView btnSmsLogin = findViewById(R.id.btn_sms_login);
         btnPlayMode = findViewById(R.id.btn_play_mode);
 
         // Load saved values
@@ -47,13 +48,17 @@ public class SettingsActivity extends AppCompatActivity {
             startActivity(new Intent(this, QrLoginActivity.class))
         );
 
+        btnSmsLogin.setOnClickListener(v ->
+            startActivity(new Intent(this, SmsLoginActivity.class))
+        );
+
         btnPlayMode.setOnClickListener(v -> cyclePlayMode());
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        // Refresh cookie field in case QR login updated it
+        // Refresh cookie field in case QR/SMS login updated it
         etCookie.setText(prefs.getString("cookie", ""));
         updatePlayModeText();
     }

@@ -16,6 +16,7 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -34,6 +35,14 @@ public class MusicApiHelper {
     private static final String USER_AGENT =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0";
+
+    // Device/version info to prevent "version too old" errors
+    private static final String OS_VER = "16.2";
+    private static final String APP_VER = "9.0.90";
+    private static final String VERSION_CODE = "140";
+    private static final String CHANNEL = "distribution";
+    private static final String OS_TYPE = "iPhone OS";
+    private static final String DEVICE_ID = UUID.randomUUID().toString().replace("-", "");
 
     private static final int CONNECT_TIMEOUT_MS = 15000;
     private static final int READ_TIMEOUT_MS = 15000;
@@ -63,6 +72,16 @@ public class MusicApiHelper {
     }
 
     public interface QrCheckCallback {
+        void onResult(int code, String message, String cookie);
+        void onError(String message);
+    }
+
+    public interface SmsCallback {
+        void onResult(boolean success, String message);
+        void onError(String message);
+    }
+
+    public interface LoginCallback {
         void onResult(int code, String message, String cookie);
         void onError(String message);
     }
@@ -271,6 +290,7 @@ public class MusicApiHelper {
                 conn.setRequestProperty("User-Agent", USER_AGENT);
                 conn.setRequestProperty("Referer", DOMAIN);
                 conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                conn.setRequestProperty("Cookie", buildAnonymousCookie(""));
                 conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
                 conn.setReadTimeout(READ_TIMEOUT_MS);
                 conn.setDoOutput(true);
@@ -312,6 +332,102 @@ public class MusicApiHelper {
         });
     }
 
+    // ==================== SMS Login ====================
+
+    /**
+     * Send SMS verification code to phone number
+     * (same as NeteaseCloudMusicApiBackup module/captcha_sent.js)
+     */
+    public static void sendSmsCode(String phone, String ctcode, SmsCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("ctcode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
+                data.put("cellphone", phone);
+
+                String response = weapiPost("/api/sms/captcha/sent", data.toString(), null);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                if (code == 200) {
+                    mainHandler.post(() -> callback.onResult(true, "验证码已发送"));
+                } else {
+                    String msg = json.optString("message", "发送失败: code=" + code);
+                    mainHandler.post(() -> callback.onResult(false, msg));
+                }
+            } catch (Exception e) {
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Login with phone number and SMS captcha
+     * (same as NeteaseCloudMusicApiBackup module/login_cellphone.js)
+     */
+    public static void loginByCellphone(String phone, String captcha, String ctcode,
+                                         LoginCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("type", "1");
+                data.put("https", "true");
+                data.put("phone", phone);
+                data.put("countrycode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
+                data.put("captcha", captcha);
+                data.put("rememberLogin", "true");
+
+                String[] encrypted = NeteaseApiCrypto.weapi(data.toString());
+                String postBody = "params=" + URLEncoder.encode(encrypted[0], "UTF-8")
+                        + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
+
+                String urlStr = DOMAIN + "/weapi/w/login/cellphone";
+                URL url = new URL(urlStr);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("User-Agent", USER_AGENT);
+                conn.setRequestProperty("Referer", DOMAIN);
+                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                conn.setRequestProperty("Cookie", buildAnonymousCookie(""));
+                conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                conn.setReadTimeout(READ_TIMEOUT_MS);
+                conn.setDoOutput(true);
+                conn.setInstanceFollowRedirects(false);
+
+                try {
+                    OutputStream os = conn.getOutputStream();
+                    os.write(postBody.getBytes("UTF-8"));
+                    os.close();
+
+                    BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    reader.close();
+
+                    JSONObject json = new JSONObject(sb.toString());
+                    int code = json.optInt("code", -1);
+                    String message = json.optString("message",
+                            json.optString("msg", ""));
+
+                    String cookieStr = "";
+                    if (code == 200) {
+                        cookieStr = extractSetCookies(conn);
+                    }
+
+                    final String finalCookie = cookieStr;
+                    mainHandler.post(() -> callback.onResult(code, message, finalCookie));
+                } finally {
+                    conn.disconnect();
+                }
+            } catch (Exception e) {
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
     // ==================== weapi POST ====================
 
     /**
@@ -337,9 +453,7 @@ public class MusicApiHelper {
         conn.setRequestProperty("User-Agent", USER_AGENT);
         conn.setRequestProperty("Referer", DOMAIN);
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        if (cookie != null && !cookie.isEmpty()) {
-            conn.setRequestProperty("Cookie", cookie);
-        }
+        conn.setRequestProperty("Cookie", buildAnonymousCookie(cookie));
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
         conn.setReadTimeout(READ_TIMEOUT_MS);
         conn.setDoOutput(true);
@@ -371,6 +485,40 @@ public class MusicApiHelper {
     }
 
     // ==================== Utility ====================
+
+    /**
+     * Build a cookie string with proper version/device info.
+     * This prevents "version too old" errors from the NetEase server.
+     * Based on NeteaseCloudMusicApiBackup util/request.js cookie construction.
+     */
+    private static String buildAnonymousCookie(String existingCookie) {
+        StringBuilder sb = new StringBuilder();
+        // Preserve existing cookie values
+        if (existingCookie != null && !existingCookie.isEmpty()) {
+            sb.append(existingCookie);
+            if (!existingCookie.endsWith("; ")) {
+                sb.append("; ");
+            }
+        }
+        // Add version/device info that the server expects
+        sb.append("__remember_me=true; ");
+        sb.append("ntes_kaola_ad=1; ");
+        sb.append("WEVNSM=1.0.0; ");
+        sb.append("osver=").append(URLEncoder_safe(OS_VER)).append("; ");
+        sb.append("deviceId=").append(DEVICE_ID).append("; ");
+        sb.append("os=").append(URLEncoder_safe(OS_TYPE)).append("; ");
+        sb.append("channel=").append(CHANNEL).append("; ");
+        sb.append("appver=").append(APP_VER);
+        return sb.toString();
+    }
+
+    private static String URLEncoder_safe(String s) {
+        try {
+            return URLEncoder.encode(s, "UTF-8");
+        } catch (Exception e) {
+            return s;
+        }
+    }
 
     /**
      * Extract __csrf token from cookie string

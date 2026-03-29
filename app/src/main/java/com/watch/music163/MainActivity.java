@@ -1,9 +1,12 @@
 package com.watch.music163;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.media.AudioManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.widget.SeekBar;
@@ -11,11 +14,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 public class MainActivity extends AppCompatActivity implements MusicPlayerManager.PlayerCallback {
 
     private static final String HEART_OUTLINE = "\u2661";
     private static final String HEART_FILLED = "\u2665";
+    private static final int STORAGE_PERMISSION_REQUEST = 100;
 
     private TextView tvSongName;
     private TextView tvArtist;
@@ -119,6 +125,21 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         playerManager.setCallback(this);
         updateUI();
+
+        // Request storage permission for saving favorites to /sdcard/163Music/
+        requestStoragePermission();
+    }
+
+    private void requestStoragePermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{
+                            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                            Manifest.permission.READ_EXTERNAL_STORAGE
+                    }, STORAGE_PERMISSION_REQUEST);
+        }
     }
 
     @Override
