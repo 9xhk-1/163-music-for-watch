@@ -1,17 +1,31 @@
-package com.qinghe.music163pro;
+package com.qinghe.music163pro.player;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.util.Log;
+
+import com.qinghe.music163pro.api.MusicApiHelper;
+import com.qinghe.music163pro.model.Song;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 public class MusicPlayerManager {
+
+    private static final String TAG = "MusicPlayer";
+    private static final String PREFS_NAME = "music163_playback_state";
+    private static final String KEY_CURRENT_SONG_JSON = "current_song_json";
+    private static final String KEY_PLAYLIST_JSON = "playlist_json";
+    private static final String KEY_CURRENT_INDEX = "current_index";
 
     public enum PlayMode {
         LIST_LOOP,      // 列表循环
@@ -58,6 +72,7 @@ public class MusicPlayerManager {
         playlist.clear();
         playlist.addAll(songs);
         currentIndex = startIndex;
+        savePlaybackState();
     }
 
     public List<Song> getPlaylist() {
@@ -174,7 +189,7 @@ public class MusicPlayerManager {
                 }
                 mediaPlayer.release();
             } catch (Exception e) {
-                android.util.Log.w("MusicPlayer", "Error stopping player", e);
+                Log.w(TAG, "Error stopping player", e);
             }
             mediaPlayer = null;
             isPlaying = false;
@@ -209,7 +224,7 @@ public class MusicPlayerManager {
             try {
                 mediaPlayer.seekTo(positionMs);
             } catch (Exception e) {
-                android.util.Log.w("MusicPlayer", "Error seeking", e);
+                Log.w(TAG, "Error seeking", e);
             }
         }
     }
@@ -283,6 +298,7 @@ public class MusicPlayerManager {
         if (song == null) return;
 
         notifySongChanged(song);
+        savePlaybackState();
 
         // Always fetch a fresh URL to avoid expired URL issues.
         // NetEase song URLs are time-limited, so cached URLs may not work.
@@ -327,6 +343,91 @@ public class MusicPlayerManager {
     private void notifyPlayStateChanged(boolean playing) {
         if (callback != null) {
             mainHandler.post(() -> callback.onPlayStateChanged(playing));
+        }
+    }
+
+    // ==================== Save / Restore Playback State ====================
+
+    /**
+     * Save current song and playlist to SharedPreferences for restore on next launch.
+     */
+    public void savePlaybackState() {
+        if (appContext == null) return;
+        try {
+            SharedPreferences prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+
+            Song current = getCurrentSong();
+            if (current != null) {
+                JSONObject songJson = new JSONObject();
+                songJson.put("id", current.getId());
+                songJson.put("name", current.getName());
+                songJson.put("artist", current.getArtist());
+                songJson.put("album", current.getAlbum());
+                editor.putString(KEY_CURRENT_SONG_JSON, songJson.toString());
+            } else {
+                editor.remove(KEY_CURRENT_SONG_JSON);
+            }
+
+            // Save playlist
+            JSONArray playlistArr = new JSONArray();
+            for (Song s : playlist) {
+                JSONObject obj = new JSONObject();
+                obj.put("id", s.getId());
+                obj.put("name", s.getName());
+                obj.put("artist", s.getArtist());
+                obj.put("album", s.getAlbum());
+                playlistArr.put(obj);
+            }
+            editor.putString(KEY_PLAYLIST_JSON, playlistArr.toString());
+            editor.putInt(KEY_CURRENT_INDEX, currentIndex);
+            editor.apply();
+        } catch (Exception e) {
+            Log.w(TAG, "Error saving playback state", e);
+        }
+    }
+
+    /**
+     * Restore playlist and current song from SharedPreferences.
+     * Does NOT start playback - just restores state for UI display.
+     * @return true if state was restored successfully
+     */
+    public boolean restorePlaybackState() {
+        if (appContext == null) return false;
+        // Don't restore if we already have a playlist loaded
+        if (!playlist.isEmpty()) return false;
+        try {
+            SharedPreferences prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String playlistJson = prefs.getString(KEY_PLAYLIST_JSON, "[]");
+            int savedIndex = prefs.getInt(KEY_CURRENT_INDEX, -1);
+
+            JSONArray arr = new JSONArray(playlistJson);
+            if (arr.length() == 0) return false;
+
+            List<Song> restoredList = new ArrayList<>();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.getJSONObject(i);
+                Song song = new Song(
+                        obj.getLong("id"),
+                        obj.optString("name", ""),
+                        obj.optString("artist", ""),
+                        obj.optString("album", "")
+                );
+                restoredList.add(song);
+            }
+
+            playlist.clear();
+            playlist.addAll(restoredList);
+            if (savedIndex >= 0 && savedIndex < playlist.size()) {
+                currentIndex = savedIndex;
+            } else {
+                currentIndex = 0;
+            }
+
+            return true;
+        } catch (Exception e) {
+            Log.w(TAG, "Error restoring playback state", e);
+            return false;
         }
     }
 }
