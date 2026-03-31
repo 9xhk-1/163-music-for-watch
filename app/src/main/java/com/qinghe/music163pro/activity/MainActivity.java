@@ -1097,7 +1097,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     /**
-     * Create a clipped audio file using MediaExtractor + MediaMuxer.
+     * Create a clipped audio file using MediaExtractor.
+     * For MP3 files, writes raw frames directly (MediaMuxer doesn't support MP3 in MPEG4 container).
+     * For other formats (AAC/M4A), uses MediaMuxer with MPEG4 container.
      * Returns null if clipping fails.
      */
     private File createClippedAudio(File sourceFile, int startMs, int endMs, String title) {
@@ -1108,15 +1110,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
             // Sanitize title for filename
             String safeName = title.replaceAll("[^a-zA-Z0-9\\u4e00-\\u9fa5()\\-_ ]", "_");
-            File outputFile = new File(ringtoneDir, safeName + ".mp3");
 
             android.media.MediaExtractor extractor = new android.media.MediaExtractor();
             extractor.setDataSource(sourceFile.getAbsolutePath());
 
             int audioTrack = -1;
+            String mime = null;
             for (int i = 0; i < extractor.getTrackCount(); i++) {
                 android.media.MediaFormat format = extractor.getTrackFormat(i);
-                String mime = format.getString(android.media.MediaFormat.KEY_MIME);
+                mime = format.getString(android.media.MediaFormat.KEY_MIME);
                 if (mime != null && mime.startsWith("audio/")) {
                     audioTrack = i;
                     break;
@@ -1129,7 +1131,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             }
 
             extractor.selectTrack(audioTrack);
+
+            // For MP3 audio, write raw frames directly since MediaMuxer MPEG4 doesn't support MP3
+            if ("audio/mpeg".equals(mime)) {
+                return createClippedMp3Raw(extractor, safeName, ringtoneDir, startMs, endMs);
+            }
+
+            // For other formats (AAC etc.), use MediaMuxer with M4A container
             android.media.MediaFormat format = extractor.getTrackFormat(audioTrack);
+            File outputFile = new File(ringtoneDir, safeName + ".m4a");
 
             android.media.MediaMuxer muxer = new android.media.MediaMuxer(
                     outputFile.getAbsolutePath(),
@@ -1166,6 +1176,45 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             return outputFile;
         } catch (Exception e) {
             Log.w(TAG, "Audio clipping failed", e);
+            return null;
+        }
+    }
+
+    /**
+     * Create a clipped MP3 file by writing raw audio frames directly.
+     * MP3 frames are self-contained, so concatenating them produces a valid MP3 file.
+     */
+    private File createClippedMp3Raw(android.media.MediaExtractor extractor,
+                                      String safeName, File ringtoneDir,
+                                      int startMs, int endMs) {
+        File outputFile = new File(ringtoneDir, safeName + ".mp3");
+        try {
+            extractor.seekTo(startMs * 1000L, android.media.MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+
+            java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(1024 * 256);
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(outputFile);
+
+            while (true) {
+                int sampleSize = extractor.readSampleData(buffer, 0);
+                if (sampleSize < 0) break;
+
+                long sampleTimeUs = extractor.getSampleTime();
+                if (sampleTimeUs > endMs * 1000L) break;
+
+                byte[] data = new byte[sampleSize];
+                buffer.position(0);
+                buffer.get(data, 0, sampleSize);
+                fos.write(data);
+                extractor.advance();
+            }
+
+            fos.close();
+            extractor.release();
+            return outputFile;
+        } catch (Exception e) {
+            Log.w(TAG, "MP3 raw clipping failed", e);
+            extractor.release();
+            if (outputFile.exists()) outputFile.delete();
             return null;
         }
     }
@@ -1474,8 +1523,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        stopRingtonePreview();
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
+        stopRingtonePreview();
         stopSeekBarUpdate();
     }
 }

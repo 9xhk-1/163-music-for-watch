@@ -2,6 +2,7 @@ package com.qinghe.music163pro.activity;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -63,7 +64,16 @@ public class RingtoneListActivity extends AppCompatActivity {
                         displayTitle += " (" + info.startSec + "s-" + info.endSec + "s)";
                     }
                     tvName.setText(displayTitle);
+                    // Enable marquee scrolling for long names
+                    tvName.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+                    tvName.setMarqueeRepeatLimit(-1);
+                    tvName.setSingleLine(true);
+                    tvName.setSelected(true);
                     tvArtist.setText(info.filePath);
+                    tvArtist.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+                    tvArtist.setMarqueeRepeatLimit(-1);
+                    tvArtist.setSingleLine(true);
+                    tvArtist.setSelected(true);
                 }
                 return view;
             }
