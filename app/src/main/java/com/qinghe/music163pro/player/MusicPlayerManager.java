@@ -50,6 +50,9 @@ public class MusicPlayerManager {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private PlayMode playMode = PlayMode.LIST_LOOP;
     private float playbackSpeed = 1.0f;
+    /** When true, pitch changes proportionally with speed (sample rate mode).
+     *  When false (default), pitch is preserved (time-stretch mode). */
+    private boolean pitchWithSpeed = false;
     private final Random random = new Random();
     private long currentlyPlayingSongId = -1;
     private Context appContext;
@@ -118,11 +121,29 @@ public class MusicPlayerManager {
         return playbackSpeed;
     }
 
+    /**
+     * Set whether pitch changes with speed (sample rate mode).
+     * @param pitchWithSpeed true = pitch changes with speed, false = pitch preserved
+     */
+    public void setPitchWithSpeed(boolean pitchWithSpeed) {
+        this.pitchWithSpeed = pitchWithSpeed;
+        applyPlaybackSpeed();
+    }
+
+    public boolean isPitchWithSpeed() {
+        return pitchWithSpeed;
+    }
+
     private void applyPlaybackSpeed() {
         if (mediaPlayer != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
                 PlaybackParams params = mediaPlayer.getPlaybackParams();
                 params.setSpeed(playbackSpeed);
+                if (pitchWithSpeed) {
+                    params.setPitch(playbackSpeed);
+                } else {
+                    params.setPitch(1.0f);
+                }
                 mediaPlayer.setPlaybackParams(params);
             } catch (Exception e) {
                 Log.w(TAG, "Error setting playback speed", e);

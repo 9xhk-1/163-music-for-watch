@@ -4,111 +4,42 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.WindowManager;
-import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
-import com.qinghe.music163pro.player.MusicPlayerManager;
 
+/**
+ * Settings activity - flat tile list style matching MoreActivity.
+ * Contains: 登录, 开关选项, 关于
+ */
 public class SettingsActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "music163_settings";
-
-    private EditText etCookie;
-    private TextView btnKeepScreenOn;
-    private TextView btnFavMode;
-    private SharedPreferences prefs;
-    private MusicPlayerManager playerManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
 
-        prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        playerManager = MusicPlayerManager.getInstance();
-
         // Apply keep screen on setting
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         if (prefs.getBoolean("keep_screen_on", false)) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
-        etCookie = findViewById(R.id.et_cookie);
-        TextView btnSave = findViewById(R.id.btn_save_cookie);
-        TextView btnQrLogin = findViewById(R.id.btn_qr_login);
-        TextView btnSmsLogin = findViewById(R.id.btn_sms_login);
-        btnKeepScreenOn = findViewById(R.id.btn_keep_screen_on);
-        btnFavMode = findViewById(R.id.btn_fav_mode);
+        TextView btnLogin = findViewById(R.id.btn_settings_login);
+        TextView btnToggle = findViewById(R.id.btn_settings_toggle);
+        TextView btnAbout = findViewById(R.id.btn_settings_about);
 
-        // Load saved values
-        etCookie.setText(prefs.getString("cookie", ""));
+        btnLogin.setOnClickListener(v ->
+                startActivity(new Intent(this, LoginActivity.class)));
 
-        updateKeepScreenOnText();
-        updateFavModeText();
+        btnToggle.setOnClickListener(v ->
+                startActivity(new Intent(this, ToggleSettingsActivity.class)));
 
-        btnSave.setOnClickListener(v -> {
-            String cookie = etCookie.getText().toString().trim();
-            if (cookie.isEmpty()) {
-                Toast.makeText(this, "Cookie为空，未保存", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            prefs.edit().putString("cookie", cookie).apply();
-            playerManager.setCookie(cookie);
-            Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
-        });
-
-        btnQrLogin.setOnClickListener(v ->
-            startActivity(new Intent(this, QrLoginActivity.class))
-        );
-
-        btnSmsLogin.setOnClickListener(v ->
-            startActivity(new Intent(this, SmsLoginActivity.class))
-        );
-
-        btnKeepScreenOn.setOnClickListener(v -> toggleKeepScreenOn());
-        btnFavMode.setOnClickListener(v -> toggleFavMode());
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Refresh cookie field in case QR/SMS login updated it
-        etCookie.setText(prefs.getString("cookie", ""));
-        updateKeepScreenOnText();
-        updateFavModeText();
-    }
-
-    private void toggleKeepScreenOn() {
-        boolean current = prefs.getBoolean("keep_screen_on", false);
-        boolean next = !current;
-        prefs.edit().putBoolean("keep_screen_on", next).apply();
-        if (next) {
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        } else {
-            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        }
-        updateKeepScreenOnText();
-    }
-
-    private void updateKeepScreenOnText() {
-        boolean on = prefs.getBoolean("keep_screen_on", false);
-        btnKeepScreenOn.setText(on ? R.string.keep_screen_on_on : R.string.keep_screen_on_off);
-    }
-
-    private void toggleFavMode() {
-        boolean isCloud = prefs.getBoolean("fav_mode_cloud", false);
-        boolean next = !isCloud;
-        prefs.edit().putBoolean("fav_mode_cloud", next).apply();
-        updateFavModeText();
-        String mode = next ? "云端" : "本地";
-        Toast.makeText(this, "收藏模式已切换为: " + mode, Toast.LENGTH_SHORT).show();
-    }
-
-    private void updateFavModeText() {
-        boolean isCloud = prefs.getBoolean("fav_mode_cloud", false);
-        btnFavMode.setText(isCloud ? R.string.fav_mode_cloud : R.string.fav_mode_local);
+        btnAbout.setOnClickListener(v ->
+                startActivity(new Intent(this, AboutActivity.class)));
     }
 }
