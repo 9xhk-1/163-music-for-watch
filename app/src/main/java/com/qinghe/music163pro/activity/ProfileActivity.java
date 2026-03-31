@@ -150,7 +150,7 @@ public class ProfileActivity extends AppCompatActivity {
                 if (vipType > 0) {
                     String vipStr;
                     switch (vipType) {
-                        case 10: vipStr = "黑胶VIP"; break;
+                        case 10:
                         case 11: vipStr = "黑胶VIP"; break;
                         default: vipStr = "VIP (类型" + vipType + ")"; break;
                     }
@@ -169,7 +169,7 @@ public class ProfileActivity extends AppCompatActivity {
                 String vipStr;
                 switch (vipType) {
                     case 0: vipStr = "普通用户"; break;
-                    case 10: vipStr = "黑胶VIP 🎵"; break;
+                    case 10:
                     case 11: vipStr = "黑胶VIP 🎵"; break;
                     default: vipStr = "VIP (类型" + vipType + ")"; break;
                 }

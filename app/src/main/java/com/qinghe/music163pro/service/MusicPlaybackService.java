@@ -129,7 +129,7 @@ public class MusicPlaybackService extends Service {
 
         builder.setContentTitle(title)
                 .setContentText(text)
-                .setSmallIcon(isPlaying ? android.R.drawable.ic_media_play : android.R.drawable.ic_media_pause)
+                .setSmallIcon(isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play)
                 .setContentIntent(contentPendingIntent)
                 .setOngoing(true)
                 .setShowWhen(false)
