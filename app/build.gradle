@@ -11,14 +11,15 @@ android {
         applicationId "com.qinghe.music163pro"
         minSdk 23
         targetSdk 27 
-        versionCode 2
-        versionName "2.0"
+        versionCode 4
+        versionName "20260331-fix1"
     }
 
     signingConfigs {
         release {
-            if (System.getenv("KEYSTORE_BASE64")) {
-                storeFile file("${rootProject.projectDir}/release.keystore")
+            def keystoreFile = file("${rootProject.projectDir}/release.keystore")
+            if (keystoreFile.exists()) {
+                storeFile keystoreFile
                 storePassword System.getenv("KEYSTORE_PASSWORD")
                 keyAlias System.getenv("KEY_ALIAS")
                 keyPassword System.getenv("KEY_PASSWORD")
@@ -34,6 +35,11 @@ android {
                 signingConfig signingConfigs.release
             }
         }
+    }
+
+    lint {
+        // Watch app not published to Google Play; targetSdk 27 is intentional
+        disable 'ExpiredTargetSdkVersion'
     }
 
     compileOptions {

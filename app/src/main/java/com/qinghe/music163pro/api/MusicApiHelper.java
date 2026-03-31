@@ -105,6 +105,26 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface LyricsCallback {
+        void onResult(String lrcText);
+        void onError(String message);
+    }
+
+    public interface CloudFavoritesCallback {
+        void onResult(List<Song> songs);
+        void onError(String message);
+    }
+
+    public interface LikeCallback {
+        void onResult(boolean success);
+        void onError(String message);
+    }
+
+    public interface CloudLikedIdsCallback {
+        void onResult(java.util.Set<Long> ids);
+        void onError(String message);
+    }
+
     // ==================== Search ====================
 
     public static void searchSongs(String keyword, String cookie, SearchCallback callback) {
@@ -384,26 +404,23 @@ public class MusicApiHelper {
     /**
      * Login with phone number and SMS captcha
      * (same as NeteaseCloudMusicApiBackup module/login_cellphone.js)
-     * Uses os=android cookie to avoid "环境不安全" error.
+     * Uses mobile cookie and weapi encryption.
      */
     public static void loginByCellphone(String phone, String captcha, String ctcode,
                                          LoginCallback callback) {
         executor.execute(() -> {
             try {
                 JSONObject data = new JSONObject();
-                data.put("type", "1");
-                data.put("https", "true");
                 data.put("phone", phone);
                 data.put("countrycode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
                 data.put("captcha", captcha);
                 data.put("rememberLogin", "true");
-                data.put("checkToken", "");
 
                 String[] encrypted = NeteaseApiCrypto.weapi(data.toString());
                 String postBody = "params=" + URLEncoder.encode(encrypted[0], "UTF-8")
                         + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
 
-                String urlStr = DOMAIN + "/weapi/w/login/cellphone";
+                String urlStr = DOMAIN + "/weapi/login/cellphone";
                 URL url = new URL(urlStr);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -449,6 +466,303 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onError(e.getMessage()));
             }
         });
+    }
+
+    // ==================== Lyrics ====================
+
+    /**
+     * Fetch lyrics for a song by its ID.
+     * (same as NeteaseCloudMusicApiBackup module/lyric_new.js)
+     */
+    public static void getLyrics(long songId, String cookie, LyricsCallback callback) {
+        executor.execute(() -> {
+            try {
+                String lrc = fetchLyrics(songId, cookie);
+                mainHandler.post(() -> callback.onResult(lrc));
+            } catch (Exception e) {
+                Log.w(TAG, "Lyrics fetch error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Fetch lyrics synchronously (for use in download).
+     */
+    public static String fetchLyricsSync(long songId, String cookie) {
+        try {
+            return fetchLyrics(songId, cookie);
+        } catch (Exception e) {
+            Log.w(TAG, "Lyrics sync fetch error", e);
+            return null;
+        }
+    }
+
+    private static String fetchLyrics(long songId, String cookie) throws Exception {
+        JSONObject data = new JSONObject();
+        data.put("id", songId);
+        data.put("cp", false);
+        data.put("tv", 0);
+        data.put("lv", 0);
+        data.put("rv", 0);
+        data.put("kv", 0);
+
+        String csrfToken = extractCsrfToken(cookie);
+        data.put("csrf_token", csrfToken);
+
+        String response = weapiPost("/api/song/lyric/v1", data.toString(), cookie);
+        JSONObject json = new JSONObject(response);
+
+        // Extract LRC lyrics
+        JSONObject lrcObj = json.optJSONObject("lrc");
+        if (lrcObj != null) {
+            String lyric = lrcObj.optString("lyric", "");
+            if (!lyric.isEmpty()) {
+                return lyric;
+            }
+        }
+        return "";
+    }
+
+    // ==================== Cloud Favorites ====================
+
+    /**
+     * Get the user's "liked songs" playlist from the cloud.
+     * Uses the user's liked playlist (first playlist from /api/user/playlist)
+     * and fetches tracks via /api/v6/playlist/detail which returns them
+     * in the correct time order (most recently liked first).
+     */
+    public static void getCloudFavorites(String cookie, CloudFavoritesCallback callback) {
+        executor.execute(() -> {
+            try {
+                long uid = extractUidFromCookie(cookie);
+                if (uid <= 0) {
+                    mainHandler.post(() -> callback.onError("请先登录"));
+                    return;
+                }
+
+                String csrfToken = extractCsrfToken(cookie);
+
+                // Step 1: Get user's liked playlist ID (first playlist)
+                JSONObject plData = new JSONObject();
+                plData.put("uid", uid);
+                plData.put("limit", 1);
+                plData.put("offset", 0);
+                plData.put("csrf_token", csrfToken);
+
+                String plResponse = weapiPost("/api/user/playlist", plData.toString(), cookie);
+                JSONObject plJson = new JSONObject(plResponse);
+                JSONArray playlists = plJson.optJSONArray("playlist");
+
+                if (playlists == null || playlists.length() == 0) {
+                    // Fallback: use legacy method
+                    getCloudFavoritesLegacy(cookie, uid, csrfToken, callback);
+                    return;
+                }
+
+                long likedPlaylistId = playlists.getJSONObject(0).getLong("id");
+
+                // Step 2: Get playlist tracks in correct time order
+                JSONObject detailData = new JSONObject();
+                detailData.put("id", likedPlaylistId);
+                detailData.put("n", 200);
+                detailData.put("csrf_token", csrfToken);
+
+                String detailResponse = weapiPost("/api/v6/playlist/detail", detailData.toString(), cookie);
+                JSONObject detailJson = new JSONObject(detailResponse);
+                JSONObject playlist = detailJson.optJSONObject("playlist");
+
+                if (playlist == null) {
+                    getCloudFavoritesLegacy(cookie, uid, csrfToken, callback);
+                    return;
+                }
+
+                JSONArray tracks = playlist.optJSONArray("tracks");
+                if (tracks == null || tracks.length() == 0) {
+                    mainHandler.post(() -> callback.onResult(new ArrayList<>()));
+                    return;
+                }
+
+                List<Song> songs = new ArrayList<>();
+                int limit = Math.min(tracks.length(), 200);
+                for (int i = 0; i < limit; i++) {
+                    JSONObject s = tracks.getJSONObject(i);
+                    long id = s.getLong("id");
+                    String name = s.getString("name");
+                    String artist = "";
+                    JSONArray ar = s.optJSONArray("ar");
+                    if (ar != null && ar.length() > 0) {
+                        artist = ar.getJSONObject(0).optString("name", "");
+                    }
+                    String album = "";
+                    JSONObject al = s.optJSONObject("al");
+                    if (al != null) {
+                        album = al.optString("name", "");
+                    }
+                    songs.add(new Song(id, name, artist, album));
+                }
+                mainHandler.post(() -> callback.onResult(songs));
+            } catch (Exception e) {
+                Log.w(TAG, "Cloud favorites error", e);
+                mainHandler.post(() -> callback.onError("获取云端收藏失败: " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Legacy fallback: get cloud favorites via /api/song/like/get + /api/v3/song/detail.
+     * Used when the playlist API is unavailable.
+     */
+    private static void getCloudFavoritesLegacy(String cookie, long uid, String csrfToken,
+                                                  CloudFavoritesCallback callback) {
+        try {
+            JSONObject likeData = new JSONObject();
+            likeData.put("uid", uid);
+            likeData.put("csrf_token", csrfToken);
+
+            String likeResponse = weapiPost("/api/song/like/get", likeData.toString(), cookie);
+            JSONObject likeJson = new JSONObject(likeResponse);
+
+            JSONArray idsArray = likeJson.optJSONArray("ids");
+            if (idsArray == null || idsArray.length() == 0) {
+                mainHandler.post(() -> callback.onResult(new ArrayList<>()));
+                return;
+            }
+
+            int limit = Math.min(idsArray.length(), 200);
+            JSONArray songIds = new JSONArray();
+            for (int i = 0; i < limit; i++) {
+                JSONObject idObj = new JSONObject();
+                idObj.put("id", idsArray.getLong(i));
+                songIds.put(idObj);
+            }
+
+            JSONObject detailData = new JSONObject();
+            detailData.put("c", songIds.toString());
+            detailData.put("csrf_token", csrfToken);
+
+            String detailResponse = weapiPost("/api/v3/song/detail", detailData.toString(), cookie);
+            JSONObject detailJson = new JSONObject(detailResponse);
+            JSONArray songsArray = detailJson.optJSONArray("songs");
+
+            java.util.Map<Long, Song> songMap = new java.util.LinkedHashMap<>();
+            if (songsArray != null) {
+                for (int i = 0; i < songsArray.length(); i++) {
+                    JSONObject s = songsArray.getJSONObject(i);
+                    long id = s.getLong("id");
+                    String name = s.getString("name");
+                    String artist = "";
+                    JSONArray ar = s.optJSONArray("ar");
+                    if (ar != null && ar.length() > 0) {
+                        artist = ar.getJSONObject(0).optString("name", "");
+                    }
+                    String album = "";
+                    JSONObject al = s.optJSONObject("al");
+                    if (al != null) {
+                        album = al.optString("name", "");
+                    }
+                    songMap.put(id, new Song(id, name, artist, album));
+                }
+            }
+
+            List<Song> songs = new ArrayList<>();
+            for (int i = 0; i < limit; i++) {
+                long id = idsArray.getLong(i);
+                Song song = songMap.get(id);
+                if (song != null) {
+                    songs.add(song);
+                }
+            }
+            mainHandler.post(() -> callback.onResult(songs));
+        } catch (Exception e) {
+            Log.w(TAG, "Cloud favorites legacy error", e);
+            mainHandler.post(() -> callback.onError("获取云端收藏失败: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Like or unlike a song on the cloud.
+     * (same as NeteaseCloudMusicApiBackup module/like.js)
+     */
+    public static void likeTrack(long trackId, boolean like, String cookie, LikeCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("trackId", trackId);
+                data.put("like", like);
+                data.put("alg", "itembased");
+                data.put("time", 3);
+
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/radio/like", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                mainHandler.post(() -> callback.onResult(code == 200));
+            } catch (Exception e) {
+                Log.w(TAG, "Like track error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Get the set of liked song IDs from the cloud (for checking like status).
+     */
+    public static void getCloudLikedIds(String cookie, CloudLikedIdsCallback callback) {
+        executor.execute(() -> {
+            try {
+                long uid = extractUidFromCookie(cookie);
+                if (uid <= 0) {
+                    mainHandler.post(() -> callback.onError("请先登录"));
+                    return;
+                }
+
+                JSONObject likeData = new JSONObject();
+                likeData.put("uid", uid);
+                String csrfToken = extractCsrfToken(cookie);
+                likeData.put("csrf_token", csrfToken);
+
+                String likeResponse = weapiPost("/api/song/like/get", likeData.toString(), cookie);
+                JSONObject likeJson = new JSONObject(likeResponse);
+
+                JSONArray idsArray = likeJson.optJSONArray("ids");
+                java.util.Set<Long> idSet = new java.util.HashSet<>();
+                if (idsArray != null) {
+                    for (int i = 0; i < idsArray.length(); i++) {
+                        idSet.add(idsArray.getLong(i));
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(idSet));
+            } catch (Exception e) {
+                Log.w(TAG, "Cloud liked IDs error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Extract user ID from cookie string (MUSIC_U contains user session).
+     * Uses /api/w/nuser/account/get to get the user's account info.
+     */
+    private static long extractUidFromCookie(String cookie) {
+        if (cookie == null || cookie.isEmpty()) return -1;
+        try {
+            JSONObject data = new JSONObject();
+            String csrfToken = extractCsrfToken(cookie);
+            data.put("csrf_token", csrfToken);
+
+            String response = weapiPost("/api/w/nuser/account/get", data.toString(), cookie);
+            JSONObject json = new JSONObject(response);
+            JSONObject account = json.optJSONObject("account");
+            if (account != null) {
+                return account.optLong("id", -1);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error extracting UID", e);
+        }
+        return -1;
     }
 
     // ==================== weapi POST ====================
@@ -562,6 +876,7 @@ public class MusicApiHelper {
     /**
      * Build a cookie string with Android mobile device identity.
      * Used for SMS login to avoid "环境不安全" error.
+     * Based on NeteaseCloudMusicApiBackup util/request.js default cookies.
      */
     private static String buildMobileCookie(String existingCookie) {
         StringBuilder sb = new StringBuilder();
@@ -574,12 +889,28 @@ public class MusicApiHelper {
         sb.append("__remember_me=true; ");
         sb.append("ntes_kaola_ad=1; ");
         sb.append("WEVNSM=1.0.0; ");
+        sb.append("NMTID=").append(generateHexId(16)).append("; ");
+        sb.append("_ntes_nuid=").append(generateHexId(16)).append("; ");
         sb.append("osver=13; ");
         sb.append("deviceId=").append(deviceId).append("; ");
         sb.append("os=android; ");
         sb.append("channel=").append(CHANNEL).append("; ");
         sb.append("appver=").append(APP_VER);
         return sb.toString();
+    }
+
+    /**
+     * Generate a random hex string of the specified byte length.
+     */
+    private static String generateHexId(int byteLength) {
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        byte[] bytes = new byte[byteLength];
+        random.nextBytes(bytes);
+        StringBuilder hex = new StringBuilder();
+        for (byte b : bytes) {
+            hex.append(String.format("%02x", b));
+        }
+        return hex.toString();
     }
 
     /**

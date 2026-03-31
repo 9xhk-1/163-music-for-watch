@@ -30,8 +30,13 @@
         <activity android:name=".activity.FavoritesListActivity" android:exported="false" />
         <activity android:name=".activity.DownloadListActivity" android:exported="false" />
         <activity android:name=".activity.SettingsActivity" android:exported="false" />
+        <activity android:name=".activity.LoginActivity" android:exported="false" />
+        <activity android:name=".activity.ToggleSettingsActivity" android:exported="false" />
+        <activity android:name=".activity.AboutActivity" android:exported="false" />
         <activity android:name=".activity.QrLoginActivity" android:exported="false" />
         <activity android:name=".activity.SmsLoginActivity" android:exported="false" />
+        <activity android:name=".activity.LyricsActivity" android:exported="false" />
+        <activity android:name=".activity.RingtoneListActivity" android:exported="false" />
 
         <service
             android:name=".service.MusicPlaybackService"

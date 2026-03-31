@@ -20,22 +20,31 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Decode keystore
-        if: env.KEYSTORE_BASE64 != ''
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            if echo "$KEYSTORE_BASE64" | base64 -di > release.keystore 2>/dev/null && [ -s release.keystore ]; then
+              echo "Keystore decoded successfully ($(wc -c < release.keystore) bytes)"
+            else
+              echo "::warning::Keystore decode failed, will build debug APK"
+              rm -f release.keystore
+            fi
+          else
+            echo "No KEYSTORE_BASE64 secret configured, will build debug APK"
+          fi
 
       - name: Build signed release APK
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -f release.keystore ]; then
+            echo "Building signed release APK..."
             ./gradlew assembleRelease
           else
             echo "No signing config found, building debug APK"

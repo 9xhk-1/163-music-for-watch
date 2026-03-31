@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
+import android.media.PlaybackParams;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -47,6 +49,10 @@ public class MusicPlayerManager {
     private PlayerCallback callback;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private PlayMode playMode = PlayMode.LIST_LOOP;
+    private float playbackSpeed = 1.0f;
+    /** When true, pitch changes proportionally with speed (sample rate mode).
+     *  When false (default), pitch is preserved (time-stretch mode). */
+    private boolean pitchWithSpeed = false;
     private final Random random = new Random();
     private long currentlyPlayingSongId = -1;
     private Context appContext;
@@ -102,6 +108,54 @@ public class MusicPlayerManager {
         return playMode;
     }
 
+    /**
+     * Set playback speed. Requires API 23+ (Marshmallow).
+     * @param speed playback speed multiplier (0.1 - 5.0)
+     */
+    public void setPlaybackSpeed(float speed) {
+        this.playbackSpeed = speed;
+        applyPlaybackSpeed();
+    }
+
+    public float getPlaybackSpeed() {
+        return playbackSpeed;
+    }
+
+    /**
+     * Set whether pitch changes with speed (sample rate mode).
+     * @param pitchWithSpeed true = pitch changes with speed, false = pitch preserved
+     */
+    public void setPitchWithSpeed(boolean pitchWithSpeed) {
+        this.pitchWithSpeed = pitchWithSpeed;
+        applyPlaybackSpeed();
+    }
+
+    public boolean isPitchWithSpeed() {
+        return pitchWithSpeed;
+    }
+
+    private void applyPlaybackSpeed() {
+        if (mediaPlayer != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                boolean wasPlaying = mediaPlayer.isPlaying();
+                PlaybackParams params = mediaPlayer.getPlaybackParams();
+                params.setSpeed(playbackSpeed);
+                if (pitchWithSpeed) {
+                    params.setPitch(playbackSpeed);
+                } else {
+                    params.setPitch(1.0f);
+                }
+                mediaPlayer.setPlaybackParams(params);
+                // Workaround: setPlaybackParams may auto-start a paused MediaPlayer
+                if (!wasPlaying && mediaPlayer.isPlaying()) {
+                    mediaPlayer.pause();
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Error setting playback speed", e);
+            }
+        }
+    }
+
     public void play(String url) {
         stop();
         mediaPlayer = new MediaPlayer();
@@ -117,6 +171,7 @@ public class MusicPlayerManager {
             mediaPlayer.setDataSource(url);
             mediaPlayer.setOnPreparedListener(mp -> {
                 mp.start();
+                applyPlaybackSpeed();
                 isPlaying = true;
                 notifyPlayStateChanged(true);
             });

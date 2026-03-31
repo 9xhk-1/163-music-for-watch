@@ -14,15 +14,16 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/settings"
+            android:text="开关选项"
             android:textColor="@color/white"
             android:textSize="15sp"
             android:textStyle="bold"
             android:gravity="center"
             android:paddingBottom="8dp" />
 
+        <!-- Keep screen on toggle -->
         <TextView
-            android:id="@+id/btn_settings_toggle"
+            android:id="@+id/btn_keep_screen_on"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginBottom="4dp"
@@ -30,14 +31,14 @@
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="🔧  开关选项"
             android:textColor="@color/white"
             android:textSize="14sp"
             android:clickable="true"
             android:focusable="true" />
 
+        <!-- Favorites mode toggle -->
         <TextView
-            android:id="@+id/btn_settings_about"
+            android:id="@+id/btn_fav_mode"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginBottom="4dp"
@@ -45,7 +46,21 @@
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="ℹ  关于"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Speed mode toggle -->
+        <TextView
+            android:id="@+id/btn_speed_mode"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginBottom="4dp"
+            android:background="@color/colorPrimary"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:textColor="@color/white"
             android:textSize="14sp"
             android:clickable="true"

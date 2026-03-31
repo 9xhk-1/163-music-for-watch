@@ -41,7 +41,7 @@ public class FavoritesManager {
         for (Song s : list) {
             if (s.getId() == song.getId()) return;
         }
-        list.add(song);
+        list.add(0, song);
         saveFavorites(list);
     }
 
