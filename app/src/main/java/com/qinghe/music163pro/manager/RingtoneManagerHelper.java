@@ -30,10 +30,25 @@ public class RingtoneManagerHelper {
     public static class RingtoneInfo {
         public String title;
         public String filePath;
+        public int startSec;
+        public int endSec;
 
         public RingtoneInfo(String title, String filePath) {
             this.title = title;
             this.filePath = filePath;
+            this.startSec = -1;
+            this.endSec = -1;
+        }
+
+        public RingtoneInfo(String title, String filePath, int startSec, int endSec) {
+            this.title = title;
+            this.filePath = filePath;
+            this.startSec = startSec;
+            this.endSec = endSec;
+        }
+
+        public boolean isClipped() {
+            return startSec >= 0 && endSec > startSec;
         }
     }
 
@@ -46,6 +61,13 @@ public class RingtoneManagerHelper {
      * Record a ringtone that was set.
      */
     public void addRingtone(String title, String filePath) {
+        addRingtone(title, filePath, -1, -1);
+    }
+
+    /**
+     * Record a clipped ringtone with start/end seconds.
+     */
+    public void addRingtone(String title, String filePath, int startSec, int endSec) {
         List<RingtoneInfo> list = getRingtones();
         // Remove existing entry with same path
         List<RingtoneInfo> updated = new ArrayList<>();
@@ -54,7 +76,7 @@ public class RingtoneManagerHelper {
                 updated.add(r);
             }
         }
-        updated.add(0, new RingtoneInfo(title, filePath));
+        updated.add(0, new RingtoneInfo(title, filePath, startSec, endSec));
         saveRingtones(updated);
     }
 
@@ -95,8 +117,10 @@ public class RingtoneManagerHelper {
                 JSONObject obj = arr.getJSONObject(i);
                 String title = obj.optString("title", "");
                 String filePath = obj.optString("filePath", "");
+                int startSec = obj.optInt("startSec", -1);
+                int endSec = obj.optInt("endSec", -1);
                 if (!title.isEmpty() && !filePath.isEmpty()) {
-                    list.add(new RingtoneInfo(title, filePath));
+                    list.add(new RingtoneInfo(title, filePath, startSec, endSec));
                 }
             }
         } catch (Exception e) {
@@ -112,6 +136,8 @@ public class RingtoneManagerHelper {
                 JSONObject obj = new JSONObject();
                 obj.put("title", r.title);
                 obj.put("filePath", r.filePath);
+                if (r.startSec >= 0) obj.put("startSec", r.startSec);
+                if (r.endSec >= 0) obj.put("endSec", r.endSec);
                 arr.put(obj);
             }
             prefs.edit().putString(KEY_RINGTONES, arr.toString()).apply();

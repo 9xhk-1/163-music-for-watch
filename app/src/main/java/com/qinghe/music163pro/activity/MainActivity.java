@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
@@ -14,6 +15,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.provider.MediaStore;
 import android.text.InputType;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -249,28 +251,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         overlayContainer.setBackgroundColor(0xCC333333); // Gray mask
 
-        // Close overlay on background click
-        overlayContainer.setOnClickListener(v -> dismissOverlay());
-
-        // Swipe right to dismiss
-        GestureDetector gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-            @Override
-            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-                if (e1 != null && e2 != null) {
-                    float diffX = e2.getX() - e1.getX();
-                    float diffY = Math.abs(e2.getY() - e1.getY());
-                    if (diffX > 80 && diffY < 200 && Math.abs(velocityX) > 200) {
-                        dismissOverlay();
-                        return true;
-                    }
-                }
-                return false;
-            }
-        });
-        overlayContainer.setOnTouchListener((v, event) -> {
-            gestureDetector.onTouchEvent(event);
-            return false;
-        });
+        // Swipe right to dismiss + click to dismiss
+        addSwipeToDismiss(overlayContainer);
 
         // Content layout - centered, scrollable
         ScrollView scrollView = new ScrollView(this);
@@ -285,14 +267,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         contentLayout.setGravity(Gravity.CENTER);
         contentLayout.setPadding(dp(16), dp(12), dp(16), dp(12));
 
-        // Title
-        TextView title = new TextView(this);
-        title.setText("更多功能");
-        title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(15);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 0, 0, dp(8));
-        contentLayout.addView(title);
+        // Title bar with close button on the right
+        contentLayout.addView(createOverlayTitleBar("更多功能"));
 
         // Function grid - 2 per row
         LinearLayout row1 = new LinearLayout(this);
@@ -407,26 +383,86 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row4.addView(placeholder);
         contentLayout.addView(row4);
 
-        // Close button at bottom center
+        scrollView.addView(contentLayout);
+        overlayContainer.addView(scrollView);
+        rootView.addView(overlayContainer);
+    }
+
+    /**
+     * Create a title bar with centered title and close button on the right.
+     * Used in all overlay panels.
+     */
+    private FrameLayout createOverlayTitleBar(String titleText) {
+        FrameLayout titleBar = new FrameLayout(this);
+        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        barParams.bottomMargin = dp(8);
+        titleBar.setLayoutParams(barParams);
+
+        // Centered title
+        TextView title = new TextView(this);
+        title.setText(titleText);
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(15);
+        title.setGravity(Gravity.CENTER);
+        FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        titleParams.gravity = Gravity.CENTER;
+        title.setLayoutParams(titleParams);
+        titleBar.addView(title);
+
+        // Close button on the right
         TextView btnClose = new TextView(this);
         btnClose.setText("✕");
         btnClose.setTextColor(0xFFFFFFFF);
-        btnClose.setTextSize(18);
+        btnClose.setTextSize(15);
         btnClose.setGravity(Gravity.CENTER);
-        btnClose.setPadding(dp(16), dp(8), dp(16), dp(8));
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        closeParams.gravity = Gravity.CENTER_HORIZONTAL;
-        closeParams.topMargin = dp(8);
+        btnClose.setPadding(dp(8), dp(4), dp(8), dp(4));
+        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        closeParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
         btnClose.setLayoutParams(closeParams);
         btnClose.setClickable(true);
         btnClose.setFocusable(true);
         btnClose.setOnClickListener(v -> dismissOverlay());
-        contentLayout.addView(btnClose);
+        titleBar.addView(btnClose);
 
-        scrollView.addView(contentLayout);
-        overlayContainer.addView(scrollView);
-        rootView.addView(overlayContainer);
+        return titleBar;
+    }
+
+    /**
+     * Add swipe-right-to-dismiss gesture to an overlay container.
+     */
+    private void addSwipeToDismiss(FrameLayout container) {
+        GestureDetector gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDown(MotionEvent e) {
+                return true; // Required for onFling to work
+            }
+
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                if (e1 != null && e2 != null) {
+                    float diffX = e2.getX() - e1.getX();
+                    float diffY = Math.abs(e2.getY() - e1.getY());
+                    if (diffX > 80 && diffY < 200 && Math.abs(velocityX) > 200) {
+                        dismissOverlay();
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public boolean onSingleTapUp(MotionEvent e) {
+                dismissOverlay();
+                return true;
+            }
+        });
+        container.setOnTouchListener((v, event) -> {
+            gestureDetector.onTouchEvent(event);
+            return true;
+        });
     }
 
     private LinearLayout createFuncItem(String icon, String label, View.OnClickListener listener) {
@@ -458,6 +494,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     private void dismissOverlay() {
+        stopRingtonePreview();
         if (overlayTimerHandler != null) {
             overlayTimerHandler.removeCallbacksAndMessages(null);
             overlayTimerHandler = null;
@@ -599,7 +636,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         overlayContainer.setBackgroundColor(0xCC333333);
-        overlayContainer.setOnClickListener(v -> dismissOverlay());
+        addSwipeToDismiss(overlayContainer);
 
         ScrollView scrollView = new ScrollView(this);
         FrameLayout.LayoutParams scrollParams = new FrameLayout.LayoutParams(
@@ -613,14 +650,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         contentLayout.setGravity(Gravity.CENTER);
         contentLayout.setPadding(dp(20), dp(20), dp(20), dp(20));
 
-        // Title
-        TextView title = new TextView(this);
-        title.setText("倍速播放");
-        title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(15);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 0, 0, dp(12));
-        contentLayout.addView(title);
+        // Title bar with close button
+        contentLayout.addView(createOverlayTitleBar("倍速播放"));
 
         // Preset speed options
         float[] speeds = {0.8f, 0.9f, 1.0f, 1.1f, 1.2f};
@@ -759,13 +790,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String mp3Path = DownloadManager.getDownloadedMp3Path(song);
 
         if (mp3Path == null) {
-            // Download first, then set as ringtone
+            // Download first, then show clip selection
             Toast.makeText(this, "正在下载歌曲...", Toast.LENGTH_SHORT).show();
             String cookie = playerManager.getCookie();
             DownloadManager.downloadSong(song, cookie, new DownloadManager.DownloadCallback() {
                 @Override
                 public void onSuccess(String filePath) {
-                    setRingtoneFromFile(new File(filePath), song.getName());
+                    runOnUiThread(() -> showRingtoneClipOverlay(new File(filePath), song.getName()));
                 }
 
                 @Override
@@ -774,11 +805,232 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 }
             });
         } else {
-            setRingtoneFromFile(new File(mp3Path), song.getName());
+            showRingtoneClipOverlay(new File(mp3Path), song.getName());
         }
     }
 
-    private void setRingtoneFromFile(File file, String title) {
+    private MediaPlayer ringtonePreviewPlayer;
+
+    private void showRingtoneClipOverlay(File file, String songTitle) {
+        // Get song duration
+        int durationMs;
+        try {
+            MediaPlayer tmp = new MediaPlayer();
+            tmp.setDataSource(file.getAbsolutePath());
+            tmp.prepare();
+            durationMs = tmp.getDuration();
+            tmp.release();
+        } catch (Exception e) {
+            Toast.makeText(this, "无法读取歌曲时长", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final int totalSec = durationMs / 1000;
+        if (totalSec <= 0) {
+            Toast.makeText(this, "歌曲时长无效", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
+
+        overlayContainer = new FrameLayout(this);
+        overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlayContainer.setBackgroundColor(0xCC333333);
+        addSwipeToDismiss(overlayContainer);
+
+        LinearLayout contentLayout = new LinearLayout(this);
+        contentLayout.setOrientation(LinearLayout.VERTICAL);
+        contentLayout.setGravity(Gravity.CENTER);
+        contentLayout.setPadding(dp(16), dp(12), dp(16), dp(12));
+        contentLayout.setOnClickListener(v -> { /* consume click */ });
+
+        FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        contentParams.gravity = Gravity.CENTER;
+        contentLayout.setLayoutParams(contentParams);
+
+        // Title bar with close button
+        contentLayout.addView(createOverlayTitleBar("节选铃声"));
+
+        // Song name
+        TextView tvSong = new TextView(this);
+        tvSong.setText(songTitle);
+        tvSong.setTextColor(0xFFCCCCCC);
+        tvSong.setTextSize(12);
+        tvSong.setGravity(Gravity.CENTER);
+        tvSong.setPadding(0, 0, 0, dp(8));
+        contentLayout.addView(tvSong);
+
+        // Start seekbar
+        final int[] startSec = {0};
+        final int[] endSec = {Math.min(totalSec, 30)};
+
+        TextView tvStart = new TextView(this);
+        tvStart.setText("起始: " + startSec[0] + "s");
+        tvStart.setTextColor(0xFFFFFFFF);
+        tvStart.setTextSize(12);
+        tvStart.setPadding(0, dp(4), 0, 0);
+        contentLayout.addView(tvStart);
+
+        SeekBar sbStart = new SeekBar(this);
+        sbStart.setMax(totalSec);
+        sbStart.setProgress(startSec[0]);
+        LinearLayout.LayoutParams seekParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        sbStart.setLayoutParams(seekParams);
+        contentLayout.addView(sbStart);
+
+        // End seekbar
+        TextView tvEnd = new TextView(this);
+        tvEnd.setText("结束: " + endSec[0] + "s");
+        tvEnd.setTextColor(0xFFFFFFFF);
+        tvEnd.setTextSize(12);
+        tvEnd.setPadding(0, dp(4), 0, 0);
+        contentLayout.addView(tvEnd);
+
+        SeekBar sbEnd = new SeekBar(this);
+        sbEnd.setMax(totalSec);
+        sbEnd.setProgress(endSec[0]);
+        sbEnd.setLayoutParams(seekParams);
+        contentLayout.addView(sbEnd);
+
+        // Duration display
+        TextView tvDuration = new TextView(this);
+        tvDuration.setText("节选: " + startSec[0] + "s - " + endSec[0] + "s (" + (endSec[0] - startSec[0]) + "秒)");
+        tvDuration.setTextColor(0xFFCCCCCC);
+        tvDuration.setTextSize(12);
+        tvDuration.setGravity(Gravity.CENTER);
+        tvDuration.setPadding(0, dp(8), 0, dp(8));
+        contentLayout.addView(tvDuration);
+
+        Runnable updateDuration = () -> {
+            int dur = endSec[0] - startSec[0];
+            tvDuration.setText("节选: " + startSec[0] + "s - " + endSec[0] + "s (" + dur + "秒)");
+        };
+
+        sbStart.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    if (progress >= endSec[0]) progress = endSec[0] - 1;
+                    if (progress < 0) progress = 0;
+                    seekBar.setProgress(progress);
+                    startSec[0] = progress;
+                    tvStart.setText("起始: " + progress + "s");
+                    updateDuration.run();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        sbEnd.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    if (progress <= startSec[0]) progress = startSec[0] + 1;
+                    if (progress > totalSec) progress = totalSec;
+                    seekBar.setProgress(progress);
+                    endSec[0] = progress;
+                    tvEnd.setText("结束: " + progress + "s");
+                    updateDuration.run();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        // Button row: Preview + Confirm
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setGravity(Gravity.CENTER);
+        btnRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        // Preview button
+        TextView btnPreview = new TextView(this);
+        btnPreview.setText("▶ 试听");
+        btnPreview.setTextColor(0xFFFFFFFF);
+        btnPreview.setTextSize(13);
+        btnPreview.setGravity(Gravity.CENTER);
+        btnPreview.setPadding(dp(12), dp(10), dp(12), dp(10));
+        btnPreview.setBackgroundColor(0xFF616161);
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        previewParams.rightMargin = dp(4);
+        btnPreview.setLayoutParams(previewParams);
+        btnPreview.setClickable(true);
+        btnPreview.setFocusable(true);
+        btnPreview.setOnClickListener(v -> {
+            if (endSec[0] <= startSec[0]) {
+                Toast.makeText(this, "请选择有效的时间范围", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            previewRingtoneClip(file, startSec[0] * 1000, endSec[0] * 1000);
+        });
+        btnRow.addView(btnPreview);
+
+        // Confirm button
+        TextView btnConfirm = new TextView(this);
+        btnConfirm.setText("✓ 确认");
+        btnConfirm.setTextColor(0xFFFFFFFF);
+        btnConfirm.setTextSize(13);
+        btnConfirm.setGravity(Gravity.CENTER);
+        btnConfirm.setPadding(dp(12), dp(10), dp(12), dp(10));
+        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        confirmParams.leftMargin = dp(4);
+        btnConfirm.setLayoutParams(confirmParams);
+        btnConfirm.setClickable(true);
+        btnConfirm.setFocusable(true);
+        btnConfirm.setOnClickListener(v -> {
+            if (endSec[0] <= startSec[0]) {
+                Toast.makeText(this, "请选择有效的时间范围", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            stopRingtonePreview();
+            String clipTitle = songTitle + " (" + startSec[0] + "s-" + endSec[0] + "s)";
+            setRingtoneFromFile(file, clipTitle, startSec[0], endSec[0]);
+            dismissOverlay();
+        });
+        btnRow.addView(btnConfirm);
+
+        contentLayout.addView(btnRow);
+
+        overlayContainer.addView(contentLayout);
+        rootView.addView(overlayContainer);
+    }
+
+    private void previewRingtoneClip(File file, int startMs, int endMs) {
+        stopRingtonePreview();
+        try {
+            ringtonePreviewPlayer = new MediaPlayer();
+            ringtonePreviewPlayer.setDataSource(file.getAbsolutePath());
+            ringtonePreviewPlayer.prepare();
+            ringtonePreviewPlayer.seekTo(startMs);
+            ringtonePreviewPlayer.start();
+            // Stop at endMs
+            final Handler previewHandler = new Handler();
+            previewHandler.postDelayed(() -> stopRingtonePreview(), endMs - startMs);
+        } catch (Exception e) {
+            Toast.makeText(this, "试听失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void stopRingtonePreview() {
+        if (ringtonePreviewPlayer != null) {
+            try {
+                if (ringtonePreviewPlayer.isPlaying()) {
+                    ringtonePreviewPlayer.stop();
+                }
+                ringtonePreviewPlayer.release();
+            } catch (Exception ignored) {}
+            ringtonePreviewPlayer = null;
+        }
+    }
+
+    private void setRingtoneFromFile(File file, String title, int startSec, int endSec) {
         try {
             // Check WRITE_SETTINGS permission on Android M+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -791,8 +1043,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 }
             }
 
+            // Create a clipped copy using MediaExtractor + MediaMuxer
+            File clipFile = createClippedAudio(file, startSec * 1000, endSec * 1000, title);
+            if (clipFile == null) {
+                // Fallback: use original file if clipping fails
+                clipFile = file;
+            }
+
             ContentValues values = new ContentValues();
-            values.put(MediaStore.MediaColumns.DATA, file.getAbsolutePath());
+            values.put(MediaStore.MediaColumns.DATA, clipFile.getAbsolutePath());
             values.put(MediaStore.MediaColumns.TITLE, title);
             values.put(MediaStore.MediaColumns.MIME_TYPE, "audio/mpeg");
             values.put(MediaStore.Audio.Media.IS_RINGTONE, true);
@@ -800,12 +1059,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             values.put(MediaStore.Audio.Media.IS_ALARM, false);
             values.put(MediaStore.Audio.Media.IS_MUSIC, false);
 
-            Uri uri = MediaStore.Audio.Media.getContentUriForPath(file.getAbsolutePath());
+            Uri uri = MediaStore.Audio.Media.getContentUriForPath(clipFile.getAbsolutePath());
 
             // Delete existing entry if any
             getContentResolver().delete(uri,
                     MediaStore.MediaColumns.DATA + "=?",
-                    new String[]{file.getAbsolutePath()});
+                    new String[]{clipFile.getAbsolutePath()});
 
             Uri newUri = getContentResolver().insert(uri, values);
             if (newUri != null) {
@@ -813,7 +1072,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                         RingtoneManager.TYPE_RINGTONE, newUri);
                 // Save ringtone info for management
                 RingtoneManagerHelper ringtoneHelper = new RingtoneManagerHelper(this);
-                ringtoneHelper.addRingtone(title, file.getAbsolutePath());
+                ringtoneHelper.addRingtone(title, clipFile.getAbsolutePath(), startSec, endSec);
                 Toast.makeText(this, "已设为铃声", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "设置铃声失败", Toast.LENGTH_SHORT).show();
@@ -821,6 +1080,85 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         } catch (Exception e) {
             Toast.makeText(this, "设置铃声失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /**
+     * Create a clipped audio file using MediaExtractor + MediaMuxer.
+     * Returns null if clipping fails.
+     */
+    private File createClippedAudio(File sourceFile, int startMs, int endMs, String title) {
+        try {
+            File ringtoneDir = new File(android.os.Environment.getExternalStorageDirectory(),
+                    "163Music/Ringtones");
+            if (!ringtoneDir.exists()) ringtoneDir.mkdirs();
+
+            // Sanitize title for filename
+            String safeName = title.replaceAll("[^a-zA-Z0-9\\u4e00-\\u9fa5()\\-_ ]", "_");
+            File outputFile = new File(ringtoneDir, safeName + ".mp3");
+
+            android.media.MediaExtractor extractor = new android.media.MediaExtractor();
+            extractor.setDataSource(sourceFile.getAbsolutePath());
+
+            int audioTrack = -1;
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                android.media.MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.getString(android.media.MediaFormat.KEY_MIME);
+                if (mime != null && mime.startsWith("audio/")) {
+                    audioTrack = i;
+                    break;
+                }
+            }
+
+            if (audioTrack < 0) {
+                extractor.release();
+                return null;
+            }
+
+            extractor.selectTrack(audioTrack);
+            android.media.MediaFormat format = extractor.getTrackFormat(audioTrack);
+
+            android.media.MediaMuxer muxer = new android.media.MediaMuxer(
+                    outputFile.getAbsolutePath(),
+                    android.media.MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            int muxerTrack = muxer.addTrack(format);
+            muxer.start();
+
+            // Seek to start position
+            extractor.seekTo(startMs * 1000L, android.media.MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+
+            java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(1024 * 256);
+            android.media.MediaCodec.BufferInfo bufferInfo = new android.media.MediaCodec.BufferInfo();
+
+            while (true) {
+                int sampleSize = extractor.readSampleData(buffer, 0);
+                if (sampleSize < 0) break;
+
+                long sampleTimeUs = extractor.getSampleTime();
+                if (sampleTimeUs > endMs * 1000L) break;
+
+                bufferInfo.offset = 0;
+                bufferInfo.size = sampleSize;
+                bufferInfo.presentationTimeUs = sampleTimeUs - startMs * 1000L;
+                bufferInfo.flags = extractor.getSampleFlags();
+
+                muxer.writeSampleData(muxerTrack, buffer, bufferInfo);
+                extractor.advance();
+            }
+
+            muxer.stop();
+            muxer.release();
+            extractor.release();
+
+            return outputFile;
+        } catch (Exception e) {
+            Log.w("MainActivity", "Audio clipping failed", e);
+            return null;
+        }
+    }
+
+    // Keep the old method for backward compatibility
+    private void setRingtoneFromFile(File file, String title) {
+        setRingtoneFromFile(file, title, 0, 0);
     }
 
     // ==================== Sleep Timer ====================
@@ -843,7 +1181,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         overlayContainer.setBackgroundColor(0xCC333333);
-        overlayContainer.setOnClickListener(v -> dismissOverlay());
+        addSwipeToDismiss(overlayContainer);
 
         ScrollView scrollView = new ScrollView(this);
         FrameLayout.LayoutParams scrollParams = new FrameLayout.LayoutParams(
@@ -857,14 +1195,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         contentLayout.setGravity(Gravity.CENTER);
         contentLayout.setPadding(dp(20), dp(20), dp(20), dp(20));
 
-        // Title
-        TextView title = new TextView(this);
-        title.setText("定时关闭");
-        title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(15);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 0, 0, dp(12));
-        contentLayout.addView(title);
+        // Title bar with close button
+        contentLayout.addView(createOverlayTitleBar("定时关闭"));
 
         // Preset timer options
         int[] minutes = {5, 10, 20, 30};
@@ -965,7 +1297,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         overlayContainer.setBackgroundColor(0xCC333333);
-        overlayContainer.setOnClickListener(v -> dismissOverlay());
+        addSwipeToDismiss(overlayContainer);
 
         LinearLayout contentLayout = new LinearLayout(this);
         contentLayout.setOrientation(LinearLayout.VERTICAL);
@@ -978,14 +1310,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         contentParams.gravity = Gravity.CENTER;
         contentLayout.setLayoutParams(contentParams);
 
-        // Title
-        TextView title = new TextView(this);
-        title.setText("定时关闭");
-        title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(15);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 0, 0, dp(12));
-        contentLayout.addView(title);
+        // Title bar with close button
+        contentLayout.addView(createOverlayTitleBar("定时关闭"));
 
         // Remaining time display
         TextView tvRemaining = new TextView(this);
