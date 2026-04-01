@@ -104,39 +104,60 @@ public class ProfileActivity extends AppCompatActivity {
 
             addSectionTitle("VIP详情");
 
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+            long now = System.currentTimeMillis();
+
             // redVipLevel / musicPackage info
             JSONObject redVipLevel = data.optJSONObject("redVipLevel");
             JSONObject associator = data.optJSONObject("associator");
             JSONObject musicPackage = data.optJSONObject("musicPackage");
 
             if (associator != null) {
-                boolean isVip = associator.optBoolean("vipCode", false)
-                        || associator.optInt("vipCode", 0) == 1;
+                // VIP start date (dynamicIconUrl may contain start info, but use available fields)
+                long startTime = associator.optLong("startTime", 0);
+                if (startTime <= 0) {
+                    // Try iconUrl timestamp or vipCode timestamp
+                    startTime = associator.optLong("createTime", 0);
+                }
+                if (startTime > 0) {
+                    addInfoRow("黑胶VIP开通", sdf.format(new java.util.Date(startTime)));
+                }
+
                 long expTime = associator.optLong("expTime", 0);
                 if (expTime > 0) {
-                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
-                    boolean expired = expTime < System.currentTimeMillis();
+                    boolean expired = expTime < now;
                     addInfoRow("黑胶VIP到期", sdf.format(new java.util.Date(expTime))
                             + (expired ? " (已过期)" : " ✓"));
+                    // Show remaining days
+                    if (expTime > now) {
+                        long days = (expTime - now) / (1000 * 60 * 60 * 24);
+                        addInfoRow("VIP剩余", days + " 天");
+                    }
+                }
+
+                // If we have both start and end, show the period
+                if (startTime > 0 && expTime > 0) {
+                    addInfoRow("VIP期间", sdf.format(new java.util.Date(startTime))
+                            + " 至 " + sdf.format(new java.util.Date(expTime)));
                 }
             }
             if (musicPackage != null) {
+                long startTime = musicPackage.optLong("startTime", 0);
+                if (startTime <= 0) {
+                    startTime = musicPackage.optLong("createTime", 0);
+                }
+                if (startTime > 0) {
+                    addInfoRow("音乐包开通", sdf.format(new java.util.Date(startTime)));
+                }
                 long expTime = musicPackage.optLong("expTime", 0);
                 if (expTime > 0) {
-                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
-                    boolean expired = expTime < System.currentTimeMillis();
+                    boolean expired = expTime < now;
                     addInfoRow("音乐包到期", sdf.format(new java.util.Date(expTime))
                             + (expired ? " (已过期)" : " ✓"));
-                }
-            }
-
-            // Try to get remaining days from redVipDynamicIconUrl or other fields
-            long now = System.currentTimeMillis();
-            if (associator != null) {
-                long expTime = associator.optLong("expTime", 0);
-                if (expTime > now) {
-                    long days = (expTime - now) / (1000 * 60 * 60 * 24);
-                    addInfoRow("VIP剩余", days + " 天");
+                    if (expTime > now) {
+                        long days = (expTime - now) / (1000 * 60 * 60 * 24);
+                        addInfoRow("音乐包剩余", days + " 天");
+                    }
                 }
             }
         } catch (Exception e) {

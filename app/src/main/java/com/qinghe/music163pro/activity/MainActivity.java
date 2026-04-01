@@ -2021,6 +2021,21 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    /**
+     * Override onBackPressed to intercept the system back gesture on watches.
+     * On 小天才 watches, right-swipe triggers onBackPressed. We only allow exit
+     * when no overlay is showing (i.e., on the main player screen).
+     * When an overlay (lyrics, functions, etc.) is visible, dismiss it instead.
+     */
+    @Override
+    public void onBackPressed() {
+        if (overlayContainer != null) {
+            dismissOverlay();
+            return;
+        }
+        super.onBackPressed();
+    }
+
     @Override
     protected void onPause() {
         super.onPause();
