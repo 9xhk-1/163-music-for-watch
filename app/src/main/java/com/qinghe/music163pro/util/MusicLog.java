@@ -79,14 +79,12 @@ public class MusicLog {
     }
 
     /**
-     * Log a full API call (URL, status code, truncated response).
+     * Log a full API call (URL, status code, full response body).
      */
-    public static void api(String tag, String method, String url, int httpCode, String responseSnippet) {
-        String msg = String.format("[API] %s %s → HTTP %d | %s",
+    public static void api(String tag, String method, String url, int httpCode, String responseBody) {
+        String msg = String.format("[API] %s %s → HTTP %d\n  响应: %s",
                 method, url, httpCode,
-                responseSnippet != null && responseSnippet.length() > 200
-                        ? responseSnippet.substring(0, 200) + "…"
-                        : responseSnippet);
+                responseBody != null ? responseBody : "(empty)");
         i(tag, msg);
     }
 

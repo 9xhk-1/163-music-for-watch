@@ -467,6 +467,7 @@ public class MusicApiHelper {
                         + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
 
                 String urlStr = DOMAIN + "/weapi/login/cellphone";
+                MusicLog.i(TAG, "[REQ] POST(sms-login) " + urlStr + "\n  请求体(原文): " + data);
                 URL url = new URL(urlStr);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -485,7 +486,6 @@ public class MusicApiHelper {
                     os.close();
 
                     int httpCode = conn.getResponseCode();
-                    MusicLog.api(TAG, "POST", urlStr, httpCode, null);
 
                     BufferedReader reader;
                     if (httpCode >= 200 && httpCode < 400) {
@@ -498,7 +498,7 @@ public class MusicApiHelper {
                                     new InputStreamReader(errStream, "UTF-8"));
                         } else {
                             String errMsg = "HTTP " + httpCode;
-                            MusicLog.w(TAG, "短信登录HTTP错误: " + errMsg);
+                            MusicLog.api(TAG, "POST(sms-login)", urlStr, httpCode, errMsg);
                             mainHandler.post(() -> callback.onResult(httpCode, errMsg, ""));
                             return;
                         }
@@ -511,7 +511,7 @@ public class MusicApiHelper {
                     reader.close();
 
                     String responseBody = sb.toString();
-                    MusicLog.api(TAG, "POST-响应", urlStr, httpCode, responseBody);
+                    MusicLog.api(TAG, "POST(sms-login)", urlStr, httpCode, responseBody);
 
                     JSONObject json = new JSONObject(responseBody);
                     int code = json.optInt("code", -1);
@@ -593,6 +593,8 @@ public class MusicApiHelper {
                         + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
 
                 String urlStr = DOMAIN + "/weapi/login/cellphone";
+                // Log request (hide actual MD5 hash for security)
+                MusicLog.i(TAG, "[REQ] POST(pwd-login) " + urlStr + "\n  请求体(原文): {phone=" + maskPhone(phone) + ", countrycode=86, password=[MD5已隐藏], rememberLogin=true}");
                 URL url = new URL(urlStr);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -611,7 +613,6 @@ public class MusicApiHelper {
                     os.close();
 
                     int httpCode = conn.getResponseCode();
-                    MusicLog.api(TAG, "POST", urlStr, httpCode, null);
 
                     BufferedReader reader;
                     if (httpCode >= 200 && httpCode < 400) {
@@ -624,7 +625,7 @@ public class MusicApiHelper {
                                     new InputStreamReader(errStream, "UTF-8"));
                         } else {
                             String errMsg = "HTTP " + httpCode;
-                            MusicLog.w(TAG, "密码登录HTTP错误: " + errMsg);
+                            MusicLog.api(TAG, "POST(pwd-login)", urlStr, httpCode, errMsg);
                             mainHandler.post(() -> callback.onResult(httpCode, errMsg, ""));
                             return;
                         }
@@ -637,7 +638,7 @@ public class MusicApiHelper {
                     reader.close();
 
                     String responseBody = sb.toString();
-                    MusicLog.api(TAG, "POST-响应", urlStr, httpCode, responseBody);
+                    MusicLog.api(TAG, "POST(pwd-login)", urlStr, httpCode, responseBody);
 
                     JSONObject json = new JSONObject(responseBody);
                     int code = json.optInt("code", -1);
@@ -974,7 +975,6 @@ public class MusicApiHelper {
                 data.put("csrf_token", csrfToken);
 
                 String response = weapiPost("/api/w/nuser/account/get", data.toString(), cookie);
-                MusicLog.d(TAG, "获取账号信息响应: " + (response.length() > 200 ? response.substring(0, 200) + "…" : response));
                 JSONObject json = new JSONObject(response);
                 mainHandler.post(() -> callback.onResult(json));
             } catch (Exception e) {
@@ -997,7 +997,6 @@ public class MusicApiHelper {
                 data.put("csrf_token", csrfToken);
 
                 String response = weapiPost("/api/music-vip-user/info", data.toString(), cookie);
-                MusicLog.d(TAG, "VIP信息响应: " + (response.length() > 300 ? response.substring(0, 300) + "…" : response));
                 JSONObject json = new JSONObject(response);
                 mainHandler.post(() -> callback.onResult(json));
             } catch (Exception e) {
@@ -1179,7 +1178,7 @@ public class MusicApiHelper {
         // weapi URL: replace /api/ with /weapi/
         String weapiPath = apiPath.replaceFirst("^/api/", "/weapi/");
         String urlStr = DOMAIN + weapiPath;
-        MusicLog.d(TAG, "weapiPost → " + urlStr);
+        MusicLog.i(TAG, "[REQ] POST " + urlStr + "\n  请求体(原文): " + jsonData);
 
         URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -1198,7 +1197,6 @@ public class MusicApiHelper {
             os.close();
 
             int responseCode = conn.getResponseCode();
-            MusicLog.api(TAG, "POST", urlStr, responseCode, null);
             BufferedReader reader;
             if (responseCode >= 200 && responseCode < 400) {
                 reader = new BufferedReader(
@@ -1214,7 +1212,9 @@ public class MusicApiHelper {
                 sb.append(line);
             }
             reader.close();
-            return sb.toString();
+            String responseBody = sb.toString();
+            MusicLog.api(TAG, "POST", urlStr, responseCode, responseBody);
+            return responseBody;
         } finally {
             conn.disconnect();
         }
@@ -1234,7 +1234,7 @@ public class MusicApiHelper {
 
         String weapiPath = apiPath.replaceFirst("^/api/", "/weapi/");
         String urlStr = DOMAIN + weapiPath;
-        MusicLog.d(TAG, "weapiPostMobile → " + urlStr);
+        MusicLog.i(TAG, "[REQ] POST(mobile) " + urlStr + "\n  请求体(原文): " + jsonData);
 
         URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -1253,7 +1253,6 @@ public class MusicApiHelper {
             os.close();
 
             int responseCode = conn.getResponseCode();
-            MusicLog.api(TAG, "POST(mobile)", urlStr, responseCode, null);
             BufferedReader reader;
             if (responseCode >= 200 && responseCode < 400) {
                 reader = new BufferedReader(
@@ -1269,7 +1268,9 @@ public class MusicApiHelper {
                 sb.append(line);
             }
             reader.close();
-            return sb.toString();
+            String responseBody = sb.toString();
+            MusicLog.api(TAG, "POST(mobile)", urlStr, responseCode, responseBody);
+            return responseBody;
         } finally {
             conn.disconnect();
         }
@@ -1426,7 +1427,6 @@ public class MusicApiHelper {
                 data.put("csrf_token", csrfToken);
 
                 String response = weapiPost("/api/music/audio/match", data.toString(), cookie);
-                MusicLog.d(TAG, "听歌识曲响应: " + (response.length() > 200 ? response.substring(0, 200) + "…" : response));
 
                 JSONObject json = new JSONObject(response);
                 int code = json.optInt("code", -1);
@@ -1483,7 +1483,6 @@ public class MusicApiHelper {
                 data.put("csrf_token", csrfToken);
 
                 String response = weapiPost("/api/music/audio/hum", data.toString(), cookie);
-                MusicLog.d(TAG, "哼歌识曲响应: " + (response.length() > 200 ? response.substring(0, 200) + "…" : response));
 
                 JSONObject json = new JSONObject(response);
                 int code = json.optInt("code", -1);
