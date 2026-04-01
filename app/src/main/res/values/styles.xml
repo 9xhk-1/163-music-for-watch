@@ -6,4 +6,10 @@
         <item name="colorAccent">@color/colorAccent</item>
         <item name="android:windowBackground">@color/bg_dark</item>
     </style>
+
+    <!-- MainActivity-only theme: disables system swipe-to-dismiss so overlay right-swipe is handled in code -->
+    <style name="AppTheme.Main">
+        <item name="android:windowSwipeToDismiss">false</item>
+    </style>
+
 </resources>

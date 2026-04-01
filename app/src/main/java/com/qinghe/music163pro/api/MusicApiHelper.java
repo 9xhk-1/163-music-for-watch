@@ -125,12 +125,41 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface AccountCallback {
+        void onResult(JSONObject accountJson);
+        void onError(String message);
+    }
+
+    public interface VipInfoCallback {
+        void onResult(JSONObject vipJson);
+        void onError(String message);
+    }
+
+    public interface TopListCallback {
+        void onResult(JSONArray listArray);
+        void onError(String message);
+    }
+
+    public interface PlaylistDetailCallback {
+        void onResult(List<Song> songs);
+        void onError(String message);
+    }
+
+    public interface PersonalFMCallback {
+        void onResult(List<Song> songs);
+        void onError(String message);
+    }
+
     // ==================== Search ====================
 
     public static void searchSongs(String keyword, String cookie, SearchCallback callback) {
+        searchSongs(keyword, 0, cookie, callback);
+    }
+
+    public static void searchSongs(String keyword, int offset, String cookie, SearchCallback callback) {
         executor.execute(() -> {
             try {
-                List<Song> songs = searchDirect(keyword, cookie);
+                List<Song> songs = searchDirect(keyword, offset, cookie);
                 mainHandler.post(() -> callback.onResult(songs));
             } catch (Exception e) {
                 Log.w(TAG, "Search error", e);
@@ -142,12 +171,12 @@ public class MusicApiHelper {
     /**
      * Search via weapi/cloudsearch/pc (same as NeteaseCloudMusicApiBackup module/cloudsearch.js)
      */
-    private static List<Song> searchDirect(String keyword, String cookie) throws Exception {
+    private static List<Song> searchDirect(String keyword, int offset, String cookie) throws Exception {
         JSONObject data = new JSONObject();
         data.put("s", keyword);
         data.put("type", 1);      // 1 = songs
         data.put("limit", 20);
-        data.put("offset", 0);
+        data.put("offset", offset);
         data.put("total", true);
 
         String csrfToken = extractCsrfToken(cookie);
@@ -455,6 +484,118 @@ public class MusicApiHelper {
                     String cookieStr = "";
                     if (code == 200) {
                         cookieStr = extractSetCookies(conn);
+                        // Fallback: if Set-Cookie headers are empty, try token from JSON body
+                        if ((cookieStr == null || cookieStr.isEmpty() || !cookieStr.contains("MUSIC_U"))
+                                && json.has("token")) {
+                            String token = json.optString("token", "");
+                            if (!token.isEmpty()) {
+                                cookieStr = "MUSIC_U=" + token;
+                            }
+                        }
+                        // Also try cookie field in JSON body
+                        if ((cookieStr == null || cookieStr.isEmpty() || !cookieStr.contains("MUSIC_U"))
+                                && json.has("cookie")) {
+                            String bodyCookie = json.optString("cookie", "");
+                            if (!bodyCookie.isEmpty() && bodyCookie.contains("MUSIC_U")) {
+                                cookieStr = bodyCookie;
+                            }
+                        }
+                    }
+
+                    final String finalCookie = cookieStr;
+                    mainHandler.post(() -> callback.onResult(code, message, finalCookie));
+                } finally {
+                    conn.disconnect();
+                }
+            } catch (Exception e) {
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    // ==================== Password Login ====================
+
+    /**
+     * Login with phone number and password.
+     * (same as NeteaseCloudMusicApiBackup module/login_cellphone.js with password mode)
+     * Uses mobile cookie and weapi encryption, same as SMS login.
+     */
+    public static void loginByPassword(String phone, String password, String ctcode,
+                                        LoginCallback callback) {
+        executor.execute(() -> {
+            try {
+                // MD5 hash the password
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+                byte[] digest = md.digest(password.getBytes("UTF-8"));
+                StringBuilder hexString = new StringBuilder();
+                for (byte b : digest) {
+                    String hex = Integer.toHexString(0xff & b);
+                    if (hex.length() == 1) hexString.append('0');
+                    hexString.append(hex);
+                }
+                String md5Password = hexString.toString();
+
+                JSONObject data = new JSONObject();
+                data.put("phone", phone);
+                data.put("countrycode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
+                data.put("password", md5Password);
+                data.put("rememberLogin", "true");
+
+                String[] encrypted = NeteaseApiCrypto.weapi(data.toString());
+                String postBody = "params=" + URLEncoder.encode(encrypted[0], "UTF-8")
+                        + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
+
+                String urlStr = DOMAIN + "/weapi/login/cellphone";
+                URL url = new URL(urlStr);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("User-Agent", MOBILE_USER_AGENT);
+                conn.setRequestProperty("Referer", DOMAIN);
+                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                conn.setRequestProperty("Cookie", buildMobileCookie(""));
+                conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                conn.setReadTimeout(READ_TIMEOUT_MS);
+                conn.setDoOutput(true);
+                conn.setInstanceFollowRedirects(false);
+
+                try {
+                    OutputStream os = conn.getOutputStream();
+                    os.write(postBody.getBytes("UTF-8"));
+                    os.close();
+
+                    BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    reader.close();
+
+                    JSONObject json = new JSONObject(sb.toString());
+                    int code = json.optInt("code", -1);
+                    String message = json.optString("message",
+                            json.optString("msg", ""));
+
+                    String cookieStr = "";
+                    if (code == 200) {
+                        cookieStr = extractSetCookies(conn);
+                        // Fallback: if Set-Cookie headers are empty, try token from JSON body
+                        if ((cookieStr == null || cookieStr.isEmpty() || !cookieStr.contains("MUSIC_U"))
+                                && json.has("token")) {
+                            String token = json.optString("token", "");
+                            if (!token.isEmpty()) {
+                                cookieStr = "MUSIC_U=" + token;
+                            }
+                        }
+                        // Also try cookie field in JSON body
+                        if ((cookieStr == null || cookieStr.isEmpty() || !cookieStr.contains("MUSIC_U"))
+                                && json.has("cookie")) {
+                            String bodyCookie = json.optString("cookie", "");
+                            if (!bodyCookie.isEmpty() && bodyCookie.contains("MUSIC_U")) {
+                                cookieStr = bodyCookie;
+                            }
+                        }
                     }
 
                     final String finalCookie = cookieStr;
@@ -737,6 +878,179 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onResult(idSet));
             } catch (Exception e) {
                 Log.w(TAG, "Cloud liked IDs error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    // ==================== User Account ====================
+
+    /**
+     * Get user account info including profile and VIP details.
+     */
+    public static void getUserAccount(String cookie, AccountCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/w/nuser/account/get", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                mainHandler.post(() -> callback.onResult(json));
+            } catch (Exception e) {
+                Log.w(TAG, "Get account error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Get VIP user info including expiry time.
+     * (same as NeteaseCloudMusicApiBackup module/vip_info.js)
+     */
+    public static void getVipInfo(String cookie, VipInfoCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/music-vip-user/info", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                mainHandler.post(() -> callback.onResult(json));
+            } catch (Exception e) {
+                Log.w(TAG, "Get VIP info error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    // ==================== Top List ====================
+
+    /**
+     * Get all top/chart lists.
+     * (same as NeteaseCloudMusicApiBackup module/toplist.js)
+     */
+    public static void getTopList(String cookie, TopListCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/toplist", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONArray list = json.optJSONArray("list");
+                if (list != null) {
+                    mainHandler.post(() -> callback.onResult(list));
+                } else {
+                    mainHandler.post(() -> callback.onError("获取排行榜失败"));
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Top list error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Get playlist detail (tracks) by playlist ID.
+     */
+    public static void getPlaylistDetail(long playlistId, String cookie, PlaylistDetailCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("id", playlistId);
+                data.put("n", 200);
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/v6/playlist/detail", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONObject playlist = json.optJSONObject("playlist");
+                if (playlist == null) {
+                    mainHandler.post(() -> callback.onError("获取歌单详情失败"));
+                    return;
+                }
+
+                JSONArray tracks = playlist.optJSONArray("tracks");
+                List<Song> songs = new ArrayList<>();
+                if (tracks != null) {
+                    int limit = Math.min(tracks.length(), 200);
+                    for (int i = 0; i < limit; i++) {
+                        JSONObject s = tracks.getJSONObject(i);
+                        long id = s.getLong("id");
+                        String name = s.getString("name");
+                        String artist = "";
+                        JSONArray ar = s.optJSONArray("ar");
+                        if (ar != null && ar.length() > 0) {
+                            artist = ar.getJSONObject(0).optString("name", "");
+                        }
+                        String album = "";
+                        JSONObject al = s.optJSONObject("al");
+                        if (al != null) {
+                            album = al.optString("name", "");
+                        }
+                        songs.add(new Song(id, name, artist, album));
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(songs));
+            } catch (Exception e) {
+                Log.w(TAG, "Playlist detail error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    // ==================== Personal FM ====================
+
+    /**
+     * Get personal FM songs.
+     * (same as NeteaseCloudMusicApiBackup module/personal_fm.js)
+     * Calls the API multiple times to accumulate more songs since each call returns ~3.
+     */
+    public static void getPersonalFM(String cookie, PersonalFMCallback callback) {
+        executor.execute(() -> {
+            try {
+                String csrfToken = extractCsrfToken(cookie);
+                List<Song> allSongs = new ArrayList<>();
+                java.util.Set<Long> seenIds = new java.util.HashSet<>();
+
+                // Call the API multiple times to get more songs (each returns ~3)
+                for (int batch = 0; batch < 5 && allSongs.size() < 15; batch++) {
+                    JSONObject data = new JSONObject();
+                    data.put("csrf_token", csrfToken);
+
+                    String response = weapiPost("/api/v1/radio/get", data.toString(), cookie);
+                    JSONObject json = new JSONObject(response);
+                    JSONArray dataArr = json.optJSONArray("data");
+                    if (dataArr != null) {
+                        for (int i = 0; i < dataArr.length(); i++) {
+                            JSONObject s = dataArr.getJSONObject(i);
+                            long id = s.getLong("id");
+                            if (seenIds.contains(id)) continue;
+                            seenIds.add(id);
+                            String name = s.getString("name");
+                            String artist = "";
+                            JSONArray artists = s.optJSONArray("artists");
+                            if (artists != null && artists.length() > 0) {
+                                artist = artists.getJSONObject(0).optString("name", "");
+                            }
+                            String album = "";
+                            JSONObject albumObj = s.optJSONObject("album");
+                            if (albumObj != null) {
+                                album = albumObj.optString("name", "");
+                            }
+                            allSongs.add(new Song(id, name, artist, album));
+                        }
+                    }
+                }
+
+                final List<Song> result = allSongs;
+                mainHandler.post(() -> callback.onResult(result));
+            } catch (Exception e) {
+                Log.w(TAG, "Personal FM error", e);
                 mainHandler.post(() -> callback.onError(e.getMessage()));
             }
         });

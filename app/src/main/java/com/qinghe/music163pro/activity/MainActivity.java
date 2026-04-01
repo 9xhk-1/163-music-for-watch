@@ -37,6 +37,7 @@ import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.manager.FavoritesManager;
+import com.qinghe.music163pro.manager.HistoryManager;
 import com.qinghe.music163pro.manager.RingtoneManagerHelper;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -69,6 +70,32 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private FrameLayout overlayContainer;
     private Handler overlayTimerHandler;
     private Runnable overlayTimerRunnable;
+
+    // Volume indicator
+    private TextView volumeIndicator;
+    private final Handler volumeHandler = new Handler();
+
+    // Activity-level gesture detector for swipe handling
+    private GestureDetector activityGestureDetector;
+
+    // Lyrics overlay state
+    private boolean lyricsOverlayShowing = false;
+    private final java.util.List<LyricLine> lyricLines = new java.util.ArrayList<>();
+    private final java.util.List<TextView> lyricViews = new java.util.ArrayList<>();
+    private int currentHighlightIndex = -1;
+    private ScrollView lyricsScrollView;
+    private LinearLayout lyricsContainer;
+    private final Handler lyricsScrollHandler = new Handler();
+    private Runnable lyricsScrollRunnable;
+
+    private static class LyricLine {
+        long timeMs;
+        String text;
+        LyricLine(long timeMs, String text) {
+            this.timeMs = timeMs;
+            this.text = text;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -142,11 +169,17 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnPrev.setOnClickListener(v -> playerManager.previous());
         btnNext.setOnClickListener(v -> playerManager.next());
 
-        btnVolDown.setOnClickListener(v ->
-                audioManager.adjustVolume(AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI));
+        btnVolDown.setOnClickListener(v -> {
+                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                        AudioManager.ADJUST_LOWER, AudioManager.FLAG_REMOVE_SOUND_AND_VIBRATE);
+                showVolumeIndicator();
+        });
 
-        btnVolUp.setOnClickListener(v ->
-                audioManager.adjustVolume(AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI));
+        btnVolUp.setOnClickListener(v -> {
+                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                        AudioManager.ADJUST_RAISE, AudioManager.FLAG_REMOVE_SOUND_AND_VIBRATE);
+                showVolumeIndicator();
+        });
 
         // Changed: "more functions" overlay instead of toggle favorite
         btnFuncMore.setOnClickListener(v -> showFunctionsOverlay());
@@ -191,10 +224,54 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         updateUI();
 
         // Start foreground service to keep alive
-        startPlaybackService("163音乐", "等待播放");
+        startPlaybackService("163音乐", "等待播放", false);
 
         // Request storage permission for saving favorites to /sdcard/163Music/
         requestStoragePermission();
+
+        // Activity-level gesture detector:
+        // - Right swipe: dismiss overlay if one is open; exit app on main player screen
+        // - Left swipe: open lyrics overlay (only when no overlay is showing)
+        activityGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDown(MotionEvent e) {
+                return true;
+            }
+
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                if (e1 == null || e2 == null) return false;
+                float diffX = e2.getX() - e1.getX();
+                float diffY = Math.abs(e2.getY() - e1.getY());
+
+                if (Math.abs(diffX) > 80 && diffY < 200 && Math.abs(velocityX) > 200) {
+                    if (diffX > 0) {
+                        // Right swipe: dismiss overlay if open; exit app on main screen
+                        if (overlayContainer != null) {
+                            dismissOverlay();
+                        } else {
+                            finish();
+                        }
+                        return true;
+                    } else {
+                        // Left swipe: show lyrics (only when no overlay is showing)
+                        if (overlayContainer == null) {
+                            showLyricsOverlay();
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+        });
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (activityGestureDetector != null) {
+            activityGestureDetector.onTouchEvent(event);
+        }
+        return super.dispatchTouchEvent(event);
     }
 
     private void requestStoragePermission() {
@@ -340,7 +417,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
         contentLayout.addView(row2);
 
-        // Row 3: 播放模式 + 歌词
+        // Row 3: 播放模式 + 倍速播放
         LinearLayout row3 = new LinearLayout(this);
         row3.setOrientation(LinearLayout.HORIZONTAL);
         row3.setGravity(Gravity.CENTER);
@@ -367,11 +444,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
         row3.addView(createFuncItem(playModeIcon, playModeLabel,
                 v -> onFuncCyclePlayMode()));
-        row3.addView(createFuncItem("📝", "歌词",
-                v -> onFuncLyrics()));
+        float currentSpeed = playerManager.getPlaybackSpeed();
+        String speedLabel = currentSpeed == 1.0f ? "倍速播放" : String.format("%.1fx", currentSpeed);
+        row3.addView(createFuncItem("⚡", speedLabel,
+                v -> onFuncPlaybackSpeed()));
         contentLayout.addView(row3);
 
-        // Row 4: 倍速播放
+        // Row 4: 播放列表
         LinearLayout row4 = new LinearLayout(this);
         row4.setOrientation(LinearLayout.HORIZONTAL);
         row4.setGravity(Gravity.CENTER);
@@ -379,10 +458,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row4.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        float currentSpeed = playerManager.getPlaybackSpeed();
-        String speedLabel = currentSpeed == 1.0f ? "倍速播放" : String.format("%.1fx", currentSpeed);
-        row4.addView(createFuncItem("⚡", speedLabel,
-                v -> onFuncPlaybackSpeed()));
+        row4.addView(createFuncItem("📋", "播放列表",
+                v -> onFuncShowPlaylist()));
         // Empty placeholder for alignment
         LinearLayout placeholder = new LinearLayout(this);
         placeholder.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
@@ -506,11 +583,60 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             overlayTimerHandler = null;
             overlayTimerRunnable = null;
         }
+        if (lyricsOverlayShowing) {
+            stopLyricsScrollSync();
+        }
         if (overlayContainer != null) {
             FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
             rootView.removeView(overlayContainer);
             overlayContainer = null;
         }
+    }
+
+    /**
+     * Show a custom volume indicator overlay on the watch screen.
+     * Displays current volume / max volume with a visual bar, auto-dismisses after 1.5 seconds.
+     */
+    private void showVolumeIndicator() {
+        int current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+        int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
+
+        if (volumeIndicator != null) {
+            rootView.removeView(volumeIndicator);
+        }
+
+        // Build volume bar string
+        StringBuilder bar = new StringBuilder();
+        for (int i = 0; i < max; i++) {
+            bar.append(i < current ? "█" : "░");
+        }
+
+        volumeIndicator = new TextView(this);
+        volumeIndicator.setText("🔊  " + current + "/" + max + "\n" + bar.toString());
+        volumeIndicator.setTextColor(0xFFFFFFFF);
+        volumeIndicator.setTextSize(13);
+        volumeIndicator.setGravity(Gravity.CENTER);
+        volumeIndicator.setBackgroundColor(0xCC333333);
+        volumeIndicator.setPadding(dp(16), dp(8), dp(16), dp(8));
+
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        params.topMargin = dp(8);
+        volumeIndicator.setLayoutParams(params);
+
+        rootView.addView(volumeIndicator);
+
+        // Auto-dismiss after 1.5 seconds
+        volumeHandler.removeCallbacksAndMessages(null);
+        volumeHandler.postDelayed(() -> {
+            if (volumeIndicator != null) {
+                rootView.removeView(volumeIndicator);
+                volumeIndicator = null;
+            }
+        }, 1500);
     }
 
     private void onFuncFavorite(Song song) {
@@ -625,7 +751,274 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     private void onFuncLyrics() {
         dismissOverlay();
-        startActivity(new Intent(this, LyricsActivity.class));
+        showLyricsOverlay();
+    }
+
+    // ==================== Lyrics Overlay ====================
+
+    /**
+     * Show lyrics as an inline overlay on the player screen.
+     * Left-swipe on player opens this; right-swipe (via dispatchTouchEvent) closes it.
+     */
+    private void showLyricsOverlay() {
+        Song song = playerManager.getCurrentSong();
+        if (song == null) {
+            Toast.makeText(this, "暂无歌曲", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
+
+        overlayContainer = new FrameLayout(this);
+        overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlayContainer.setBackgroundColor(0xFF212121);
+        // Don't use addSwipeToDismiss - dispatchTouchEvent handles it
+
+        LinearLayout mainLayout = new LinearLayout(this);
+        mainLayout.setOrientation(LinearLayout.VERTICAL);
+        mainLayout.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        // Song name at top
+        TextView tvSongLabel = new TextView(this);
+        tvSongLabel.setText(song.getName() + " - " + song.getArtist());
+        tvSongLabel.setTextColor(0xFFFFFFFF);
+        tvSongLabel.setTextSize(13);
+        tvSongLabel.setGravity(Gravity.CENTER);
+        tvSongLabel.setPadding(dp(6), dp(6), dp(6), dp(4));
+        tvSongLabel.setSingleLine(true);
+        tvSongLabel.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+        tvSongLabel.setSelected(true);
+        mainLayout.addView(tvSongLabel);
+
+        // Lyrics scroll view
+        lyricsScrollView = new ScrollView(this);
+        lyricsScrollView.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+        lyricsScrollView.setFadingEdgeLength(dp(20));
+        lyricsScrollView.setVerticalFadingEdgeEnabled(true);
+        lyricsScrollView.setScrollBarSize(0);
+
+        lyricsContainer = new LinearLayout(this);
+        lyricsContainer.setOrientation(LinearLayout.VERTICAL);
+        lyricsContainer.setGravity(Gravity.CENTER_HORIZONTAL);
+        lyricsContainer.setPadding(dp(12), dp(40), dp(12), dp(40));
+        lyricsScrollView.addView(lyricsContainer);
+        mainLayout.addView(lyricsScrollView);
+
+        // Time display at bottom
+        final TextView tvLyricsTime = new TextView(this);
+        tvLyricsTime.setTextColor(0xFF757575);
+        tvLyricsTime.setTextSize(10);
+        tvLyricsTime.setGravity(Gravity.CENTER);
+        tvLyricsTime.setPadding(0, dp(2), 0, dp(4));
+        tvLyricsTime.setText("← 右滑返回");
+        mainLayout.addView(tvLyricsTime);
+
+        overlayContainer.addView(mainLayout);
+        rootView.addView(overlayContainer);
+        lyricsOverlayShowing = true;
+
+        // Load lyrics
+        loadLyricsForOverlay(song, tvLyricsTime);
+    }
+
+    private void loadLyricsForOverlay(Song song, TextView tvLyricsTime) {
+        // Try local .lrc file first
+        String localLrc = loadLocalLrc(song);
+        if (localLrc != null && !localLrc.isEmpty()) {
+            parseLrc(localLrc);
+            displayLyricsInOverlay();
+            startLyricsScrollSync(tvLyricsTime);
+            return;
+        }
+
+        // Fetch from API
+        if (song.getId() <= 0) {
+            showNoLyricsInOverlay();
+            return;
+        }
+
+        // Show loading
+        lyricsContainer.removeAllViews();
+        TextView tvLoading = new TextView(this);
+        tvLoading.setText("加载歌词中...");
+        tvLoading.setTextColor(0xFF888888);
+        tvLoading.setTextSize(13);
+        tvLoading.setGravity(Gravity.CENTER);
+        lyricsContainer.addView(tvLoading);
+
+        String cookie = playerManager.getCookie();
+        MusicApiHelper.getLyrics(song.getId(), cookie, new MusicApiHelper.LyricsCallback() {
+            @Override
+            public void onResult(String lrcText) {
+                if (lrcText == null || lrcText.isEmpty()) {
+                    showNoLyricsInOverlay();
+                    return;
+                }
+                parseLrc(lrcText);
+                displayLyricsInOverlay();
+                startLyricsScrollSync(tvLyricsTime);
+            }
+
+            @Override
+            public void onError(String message) {
+                showNoLyricsInOverlay();
+            }
+        });
+    }
+
+    private String loadLocalLrc(Song song) {
+        try {
+            String safeName = song.getName().replaceAll("[\\\\/:*?\"<>|]", "_");
+            String safeArtist = song.getArtist().replaceAll("[\\\\/:*?\"<>|]", "_");
+            String folderName = safeName + " - " + safeArtist;
+            java.io.File lrcFile = new java.io.File(
+                    android.os.Environment.getExternalStorageDirectory(),
+                    "163Music/Download/" + folderName + "/lyrics.lrc"
+            );
+            if (!lrcFile.exists()) return null;
+
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(lrcFile);
+                 java.io.InputStreamReader reader = new java.io.InputStreamReader(fis, "UTF-8")) {
+                StringBuilder sb = new StringBuilder();
+                char[] buf = new char[1024];
+                int len;
+                while ((len = reader.read(buf)) != -1) {
+                    sb.append(buf, 0, len);
+                }
+                return sb.toString();
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static final java.util.regex.Pattern LRC_PATTERN =
+            java.util.regex.Pattern.compile("\\[(\\d{1,3}):(\\d{2})\\.?(\\d{0,3})\\](.*)");
+
+    private void parseLrc(String lrcText) {
+        lyricLines.clear();
+        String[] lines = lrcText.split("\n");
+        for (String line : lines) {
+            java.util.regex.Matcher matcher = LRC_PATTERN.matcher(line.trim());
+            if (matcher.matches()) {
+                int min = Integer.parseInt(matcher.group(1));
+                int sec = Integer.parseInt(matcher.group(2));
+                String msStr = matcher.group(3);
+                int ms = 0;
+                if (msStr != null && !msStr.isEmpty()) {
+                    int parsed = Integer.parseInt(msStr.substring(0, Math.min(msStr.length(), 3)));
+                    if (msStr.length() == 1) ms = parsed * 100;
+                    else if (msStr.length() == 2) ms = parsed * 10;
+                    else ms = parsed;
+                }
+                long timeMs = (long) min * 60 * 1000 + (long) sec * 1000 + ms;
+                String text = matcher.group(4).trim();
+                if (!text.isEmpty()) {
+                    lyricLines.add(new LyricLine(timeMs, text));
+                }
+            }
+        }
+    }
+
+    private void displayLyricsInOverlay() {
+        if (lyricsContainer == null) return;
+        lyricsContainer.removeAllViews();
+        lyricViews.clear();
+        currentHighlightIndex = -1;
+
+        if (lyricLines.isEmpty()) {
+            showNoLyricsInOverlay();
+            return;
+        }
+
+        for (LyricLine line : lyricLines) {
+            TextView tv = new TextView(this);
+            tv.setText(line.text);
+            tv.setTextColor(0xFF888888);
+            tv.setTextSize(13);
+            tv.setGravity(Gravity.CENTER);
+            tv.setPadding(0, dp(6), 0, dp(6));
+            lyricsContainer.addView(tv);
+            lyricViews.add(tv);
+        }
+    }
+
+    private void showNoLyricsInOverlay() {
+        if (lyricsContainer == null) return;
+        lyricsContainer.removeAllViews();
+        lyricViews.clear();
+        TextView tv = new TextView(this);
+        tv.setText("暂无歌词");
+        tv.setTextColor(0xFF888888);
+        tv.setTextSize(14);
+        tv.setGravity(Gravity.CENTER);
+        tv.setPadding(0, dp(40), 0, 0);
+        lyricsContainer.addView(tv);
+    }
+
+    private void startLyricsScrollSync(final TextView tvLyricsTime) {
+        if (lyricLines.isEmpty()) return;
+
+        lyricsScrollRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!lyricsOverlayShowing || overlayContainer == null) return;
+                if (playerManager.isPlaying() || playerManager.getCurrentPosition() > 0) {
+                    int currentPos = playerManager.getCurrentPosition();
+                    int duration = playerManager.getDuration();
+
+                    tvLyricsTime.setText(formatTime(currentPos) + " / " + formatTime(duration) + "  ← 右滑返回");
+
+                    int newIndex = -1;
+                    for (int i = 0; i < lyricLines.size(); i++) {
+                        if (lyricLines.get(i).timeMs <= currentPos) {
+                            newIndex = i;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (newIndex != currentHighlightIndex && newIndex >= 0) {
+                        if (currentHighlightIndex >= 0 && currentHighlightIndex < lyricViews.size()) {
+                            lyricViews.get(currentHighlightIndex).setTextColor(0xFF888888);
+                            lyricViews.get(currentHighlightIndex).setTextSize(13);
+                        }
+                        currentHighlightIndex = newIndex;
+                        if (currentHighlightIndex < lyricViews.size()) {
+                            TextView currentView = lyricViews.get(currentHighlightIndex);
+                            currentView.setTextColor(0xFFFFFFFF);
+                            currentView.setTextSize(14);
+
+                            // Scroll to center the current line
+                            currentView.post(() -> {
+                                if (lyricsScrollView == null) return;
+                                int scrollViewHeight = lyricsScrollView.getHeight();
+                                int targetTop = currentView.getTop();
+                                int targetHeight = currentView.getHeight();
+                                int scrollTo = targetTop - (scrollViewHeight / 2) + (targetHeight / 2);
+                                lyricsScrollView.smoothScrollTo(0, Math.max(0, scrollTo));
+                            });
+                        }
+                    }
+                }
+                lyricsScrollHandler.postDelayed(this, 300);
+            }
+        };
+        lyricsScrollHandler.post(lyricsScrollRunnable);
+    }
+
+    private void stopLyricsScrollSync() {
+        lyricsScrollHandler.removeCallbacksAndMessages(null);
+        lyricsScrollRunnable = null;
+        lyricsOverlayShowing = false;
+        lyricLines.clear();
+        lyricViews.clear();
+        currentHighlightIndex = -1;
+        lyricsScrollView = null;
+        lyricsContainer = null;
     }
 
     // ==================== Playback Speed ====================
@@ -633,6 +1026,109 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void onFuncPlaybackSpeed() {
         dismissOverlay();
         showSpeedOptions();
+    }
+
+    private void onFuncShowPlaylist() {
+        dismissOverlay();
+        showPlaylistOverlay();
+    }
+
+    /**
+     * Show the current playlist as an overlay with song list.
+     * Tapping a song plays it and dismisses the overlay.
+     */
+    private void showPlaylistOverlay() {
+        java.util.List<Song> playlist = playerManager.getPlaylist();
+        if (playlist == null || playlist.isEmpty()) {
+            Toast.makeText(this, "播放列表为空", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
+
+        overlayContainer = new FrameLayout(this);
+        overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlayContainer.setBackgroundColor(0xCC333333);
+        addSwipeToDismiss(overlayContainer);
+
+        LinearLayout contentLayout = new LinearLayout(this);
+        contentLayout.setOrientation(LinearLayout.VERTICAL);
+        contentLayout.setPadding(dp(8), dp(8), dp(8), dp(8));
+        contentLayout.setBackgroundColor(0xFF212121);
+        FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+        contentLayout.setLayoutParams(contentParams);
+        contentLayout.setOnClickListener(v -> { /* consume click */ });
+
+        // Title bar
+        contentLayout.addView(createOverlayTitleBar("播放列表 (" + playlist.size() + "首)"));
+
+        // Song list in a ScrollView
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+
+        LinearLayout listLayout = new LinearLayout(this);
+        listLayout.setOrientation(LinearLayout.VERTICAL);
+        scrollView.addView(listLayout);
+
+        int currentIndex = playerManager.getCurrentIndex();
+        for (int i = 0; i < playlist.size(); i++) {
+            final int index = i;
+            Song song = playlist.get(i);
+
+            LinearLayout itemLayout = new LinearLayout(this);
+            itemLayout.setOrientation(LinearLayout.VERTICAL);
+            itemLayout.setPadding(dp(8), dp(6), dp(8), dp(6));
+            itemLayout.setClickable(true);
+            itemLayout.setFocusable(true);
+
+            // Highlight current playing song
+            if (i == currentIndex) {
+                itemLayout.setBackgroundColor(0xFF333333);
+            }
+
+            TextView tvName = new TextView(this);
+            String prefix = (i == currentIndex) ? "▶ " : (i + 1) + ". ";
+            tvName.setText(prefix + song.getName());
+            tvName.setTextColor(i == currentIndex ? 0xFFD32F2F : 0xFFFFFFFF);
+            tvName.setTextSize(13);
+            tvName.setSingleLine(true);
+            tvName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            itemLayout.addView(tvName);
+
+            TextView tvArtist = new TextView(this);
+            tvArtist.setText(song.getArtist());
+            tvArtist.setTextColor(0xFF757575);
+            tvArtist.setTextSize(11);
+            tvArtist.setSingleLine(true);
+            tvArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            itemLayout.addView(tvArtist);
+
+            itemLayout.setOnClickListener(v -> {
+                playerManager.setPlaylist(new java.util.ArrayList<>(playlist), index);
+                playerManager.playCurrent();
+                dismissOverlay();
+            });
+
+            listLayout.addView(itemLayout);
+        }
+
+        contentLayout.addView(scrollView);
+        overlayContainer.addView(contentLayout);
+
+        // Scroll to current song
+        if (currentIndex > 0) {
+            scrollView.post(() -> {
+                View child = listLayout.getChildAt(currentIndex);
+                if (child != null) {
+                    scrollView.smoothScrollTo(0, child.getTop());
+                }
+            });
+        }
+
+        rootView.addView(overlayContainer);
     }
 
     private void showSpeedOptions() {
@@ -1454,7 +1950,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     public void onSongChanged(Song song) {
         tvSongName.setText(song.getName());
         tvArtist.setText(song.getArtist());
-        startPlaybackService(song.getName(), song.getArtist());
+        startPlaybackService(song.getName(), song.getArtist(), true);
+        // Save to play history
+        HistoryManager.getInstance().addToHistory(song);
     }
 
     @Override
@@ -1462,15 +1960,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnPlay.setText(isPlaying ? "\u23F8" : "\u25B6");
         if (isPlaying) {
             startSeekBarUpdate();
-            if (!serviceStarted) {
-                Song song = playerManager.getCurrentSong();
-                String name = song != null ? song.getName() : "";
-                String artist = song != null ? song.getArtist() : "";
-                startPlaybackService(name, artist);
-            }
         } else {
             stopSeekBarUpdate();
         }
+        // Always update notification with current play state
+        Song song = playerManager.getCurrentSong();
+        String name = song != null ? song.getName() : "";
+        String artist = song != null ? song.getArtist() : "";
+        startPlaybackService(name, artist, isPlaying);
     }
 
     @Override
@@ -1504,10 +2001,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         seekHandler.removeCallbacks(seekBarUpdateRunnable);
     }
 
-    private void startPlaybackService(String songName, String artist) {
+    private void startPlaybackService(String songName, String artist, boolean isPlaying) {
         Intent serviceIntent = new Intent(this, MusicPlaybackService.class);
         serviceIntent.putExtra("song_name", songName);
         serviceIntent.putExtra("artist", artist);
+        serviceIntent.putExtra("is_playing", isPlaying);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
         } else {
@@ -1527,10 +2025,26 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    /**
+     * Override onBackPressed to intercept the system back gesture on watches.
+     * On 小天才 watches, right-swipe triggers onBackPressed. We only allow exit
+     * when no overlay is showing (i.e., on the main player screen).
+     * When an overlay (lyrics, functions, etc.) is visible, dismiss it instead.
+     */
+    @Override
+    public void onBackPressed() {
+        if (overlayContainer != null) {
+            dismissOverlay();
+            return;
+        }
+        super.onBackPressed();
+    }
+
     @Override
     protected void onPause() {
         super.onPause();
         stopRingtonePreview();
+        lyricsScrollHandler.removeCallbacksAndMessages(null);
     }
 
     @Override
@@ -1538,5 +2052,6 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         super.onDestroy();
         stopRingtonePreview();
         stopSeekBarUpdate();
+        lyricsScrollHandler.removeCallbacksAndMessages(null);
     }
 }

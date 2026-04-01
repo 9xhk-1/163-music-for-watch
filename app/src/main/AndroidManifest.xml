@@ -18,7 +18,8 @@
 
         <activity
             android:name=".activity.MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@style/AppTheme.Main">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -35,8 +36,13 @@
         <activity android:name=".activity.AboutActivity" android:exported="false" />
         <activity android:name=".activity.QrLoginActivity" android:exported="false" />
         <activity android:name=".activity.SmsLoginActivity" android:exported="false" />
+        <activity android:name=".activity.PasswordLoginActivity" android:exported="false" />
         <activity android:name=".activity.LyricsActivity" android:exported="false" />
         <activity android:name=".activity.RingtoneListActivity" android:exported="false" />
+        <activity android:name=".activity.ProfileActivity" android:exported="false" />
+        <activity android:name=".activity.TopListActivity" android:exported="false" />
+        <activity android:name=".activity.TopListDetailActivity" android:exported="false" />
+        <activity android:name=".activity.HistoryActivity" android:exported="false" />
 
         <service
             android:name=".service.MusicPlaybackService"

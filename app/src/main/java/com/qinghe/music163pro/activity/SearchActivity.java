@@ -30,12 +30,14 @@ import java.util.List;
 /**
  * Search activity - search songs and play from results.
  * Long press search history to delete with confirmation dialog.
+ * Supports infinite scrolling: loads next 20 results when reaching bottom.
  */
 public class SearchActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "music163_settings";
     private static final String KEY_SEARCH_HISTORY = "search_history";
     private static final int MAX_HISTORY = 20;
+    private static final int PAGE_SIZE = 20;
 
     private EditText etSearch;
     private ListView lvSongs;
@@ -46,6 +48,11 @@ public class SearchActivity extends AppCompatActivity {
     private final List<String> historyList = new ArrayList<>();
     private MusicPlayerManager playerManager;
     private SharedPreferences prefs;
+
+    private String currentKeyword = "";
+    private int currentOffset = 0;
+    private boolean isLoadingMore = false;
+    private boolean hasMoreResults = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -119,15 +126,34 @@ public class SearchActivity extends AppCompatActivity {
             startActivity(intent);
             finish();
         });
+
+        // Infinite scroll: load more when reaching bottom
+        lvSongs.setOnScrollListener(new android.widget.AbsListView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(android.widget.AbsListView view, int scrollState) {}
+
+            @Override
+            public void onScroll(android.widget.AbsListView view, int firstVisibleItem,
+                                 int visibleItemCount, int totalItemCount) {
+                if (totalItemCount > 0 && firstVisibleItem + visibleItemCount >= totalItemCount
+                        && !isLoadingMore && hasMoreResults) {
+                    loadMore();
+                }
+            }
+        });
     }
 
     private void doSearch() {
         String keyword = etSearch.getText().toString().trim();
         if (keyword.isEmpty()) return;
 
+        currentKeyword = keyword;
+        currentOffset = 0;
+        hasMoreResults = true;
+
         addToSearchHistory(keyword);
         String cookie = playerManager.getCookie();
-        MusicApiHelper.searchSongs(keyword, cookie, new MusicApiHelper.SearchCallback() {
+        MusicApiHelper.searchSongs(keyword, 0, cookie, new MusicApiHelper.SearchCallback() {
             @Override
             public void onResult(List<Song> songs) {
                 displayList.clear();
@@ -135,6 +161,8 @@ public class SearchActivity extends AppCompatActivity {
                 adapter.notifyDataSetChanged();
                 lvSongs.setVisibility(View.VISIBLE);
                 lvHistory.setVisibility(View.GONE);
+                currentOffset = songs.size();
+                hasMoreResults = songs.size() >= PAGE_SIZE;
                 if (songs.isEmpty()) {
                     Toast.makeText(SearchActivity.this, R.string.no_song, Toast.LENGTH_SHORT).show();
                 }
@@ -142,6 +170,33 @@ public class SearchActivity extends AppCompatActivity {
 
             @Override
             public void onError(String message) {
+                Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void loadMore() {
+        if (currentKeyword.isEmpty() || isLoadingMore || !hasMoreResults) return;
+        isLoadingMore = true;
+
+        String cookie = playerManager.getCookie();
+        MusicApiHelper.searchSongs(currentKeyword, currentOffset, cookie, new MusicApiHelper.SearchCallback() {
+            @Override
+            public void onResult(List<Song> songs) {
+                isLoadingMore = false;
+                if (songs.isEmpty()) {
+                    hasMoreResults = false;
+                    return;
+                }
+                displayList.addAll(songs);
+                adapter.notifyDataSetChanged();
+                currentOffset += songs.size();
+                hasMoreResults = songs.size() >= PAGE_SIZE;
+            }
+
+            @Override
+            public void onError(String message) {
+                isLoadingMore = false;
                 Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
             }
         });
