@@ -1,6 +1,7 @@
 package com.qinghe.music163pro.api;
 
 import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.util.MusicLog;
 
 import android.os.Handler;
 import android.os.Looper;
@@ -150,6 +151,12 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface RecognitionCallback {
+        /** Called with matched song info: name, artist, album (any may be empty). */
+        void onResult(String songName, String artist, String album, long songId);
+        void onError(String message);
+    }
+
     // ==================== Search ====================
 
     public static void searchSongs(String keyword, String cookie, SearchCallback callback) {
@@ -159,11 +166,13 @@ public class MusicApiHelper {
     public static void searchSongs(String keyword, int offset, String cookie, SearchCallback callback) {
         executor.execute(() -> {
             try {
+                MusicLog.op(TAG, "搜索歌曲", "keyword=" + keyword + " offset=" + offset);
                 List<Song> songs = searchDirect(keyword, offset, cookie);
+                MusicLog.d(TAG, "搜索结果: " + songs.size() + " 首");
                 mainHandler.post(() -> callback.onResult(songs));
             } catch (Exception e) {
-                Log.w(TAG, "Search error", e);
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.w(TAG, "搜索失败: " + keyword, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
@@ -226,19 +235,22 @@ public class MusicApiHelper {
         executor.execute(() -> {
             try {
                 String url = null;
+                MusicLog.op(TAG, "获取歌曲URL", "songId=" + songId + " tryVip=" + tryVip);
 
                 // Try weapi with VIP quality levels
                 if (tryVip && cookie != null && !cookie.isEmpty()) {
                     try {
                         url = fetchSongUrlWeapi(songId, cookie, "exhigh");
+                        if (url != null) MusicLog.d(TAG, "获取exhigh URL成功: " + songId);
                     } catch (Exception e) {
-                        Log.w(TAG, "weapi exhigh failed", e);
+                        MusicLog.w(TAG, "weapi exhigh 失败: " + songId, e);
                     }
                     if (url == null) {
                         try {
                             url = fetchSongUrlWeapi(songId, cookie, "standard");
+                            if (url != null) MusicLog.d(TAG, "获取standard URL成功(vip): " + songId);
                         } catch (Exception e) {
-                            Log.w(TAG, "weapi standard failed", e);
+                            MusicLog.w(TAG, "weapi standard(vip) 失败: " + songId, e);
                         }
                     }
                 }
@@ -247,20 +259,23 @@ public class MusicApiHelper {
                 if (url == null) {
                     try {
                         url = fetchSongUrlWeapi(songId, cookie, "standard");
+                        if (url != null) MusicLog.d(TAG, "获取standard URL成功(无vip): " + songId);
                     } catch (Exception e) {
-                        Log.w(TAG, "weapi standard (no-vip) failed", e);
+                        MusicLog.w(TAG, "weapi standard(无vip) 失败: " + songId, e);
                     }
                 }
 
                 // Last resort: direct link
                 if (url == null) {
                     url = "https://music.163.com/song/media/outer/url?id=" + songId + ".mp3";
+                    MusicLog.w(TAG, "使用直连兜底URL: " + songId);
                 }
 
                 String finalUrl = url;
                 mainHandler.post(() -> callback.onResult(finalUrl));
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.e(TAG, "getSongUrl 异常: " + songId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
@@ -439,6 +454,8 @@ public class MusicApiHelper {
                                          LoginCallback callback) {
         executor.execute(() -> {
             try {
+                MusicLog.op(TAG, "短信登录", "phone=" + maskPhone(phone));
+
                 JSONObject data = new JSONObject();
                 data.put("phone", phone);
                 data.put("countrycode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
@@ -467,8 +484,25 @@ public class MusicApiHelper {
                     os.write(postBody.getBytes("UTF-8"));
                     os.close();
 
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    int httpCode = conn.getResponseCode();
+                    MusicLog.api(TAG, "POST", urlStr, httpCode, null);
+
+                    BufferedReader reader;
+                    if (httpCode >= 200 && httpCode < 400) {
+                        reader = new BufferedReader(
+                                new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    } else {
+                        java.io.InputStream errStream = conn.getErrorStream();
+                        if (errStream != null) {
+                            reader = new BufferedReader(
+                                    new InputStreamReader(errStream, "UTF-8"));
+                        } else {
+                            String errMsg = "HTTP " + httpCode;
+                            MusicLog.w(TAG, "短信登录HTTP错误: " + errMsg);
+                            mainHandler.post(() -> callback.onResult(httpCode, errMsg, ""));
+                            return;
+                        }
+                    }
                     StringBuilder sb = new StringBuilder();
                     String line;
                     while ((line = reader.readLine()) != null) {
@@ -476,20 +510,25 @@ public class MusicApiHelper {
                     }
                     reader.close();
 
-                    JSONObject json = new JSONObject(sb.toString());
+                    String responseBody = sb.toString();
+                    MusicLog.api(TAG, "POST-响应", urlStr, httpCode, responseBody);
+
+                    JSONObject json = new JSONObject(responseBody);
                     int code = json.optInt("code", -1);
-                    String message = json.optString("message",
-                            json.optString("msg", ""));
+                    String message = json.optString("message", json.optString("msg", ""));
+                    if (message.isEmpty()) message = "code=" + code;
 
                     String cookieStr = "";
                     if (code == 200) {
                         cookieStr = extractSetCookies(conn);
+                        MusicLog.d(TAG, "短信登录成功，Set-Cookie: " + (cookieStr.isEmpty() ? "(空)" : "已获取"));
                         // Fallback: if Set-Cookie headers are empty, try token from JSON body
                         if ((cookieStr == null || cookieStr.isEmpty() || !cookieStr.contains("MUSIC_U"))
                                 && json.has("token")) {
                             String token = json.optString("token", "");
                             if (!token.isEmpty()) {
                                 cookieStr = "MUSIC_U=" + token;
+                                MusicLog.d(TAG, "短信登录: 从token字段提取Cookie");
                             }
                         }
                         // Also try cookie field in JSON body
@@ -498,17 +537,23 @@ public class MusicApiHelper {
                             String bodyCookie = json.optString("cookie", "");
                             if (!bodyCookie.isEmpty() && bodyCookie.contains("MUSIC_U")) {
                                 cookieStr = bodyCookie;
+                                MusicLog.d(TAG, "短信登录: 从cookie字段提取Cookie");
                             }
                         }
+                    } else {
+                        MusicLog.w(TAG, "短信登录失败: code=" + code + " message=" + message);
                     }
 
                     final String finalCookie = cookieStr;
-                    mainHandler.post(() -> callback.onResult(code, message, finalCookie));
+                    final String finalMsg = message;
+                    mainHandler.post(() -> callback.onResult(code, finalMsg, finalCookie));
                 } finally {
                     conn.disconnect();
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.e(TAG, "短信登录异常", e);
+                String errMsg = e.getMessage() != null ? e.getMessage() : "网络连接失败";
+                mainHandler.post(() -> callback.onError(errMsg));
             }
         });
     }
@@ -524,6 +569,8 @@ public class MusicApiHelper {
                                         LoginCallback callback) {
         executor.execute(() -> {
             try {
+                MusicLog.op(TAG, "密码登录", "phone=" + maskPhone(phone));
+
                 // MD5 hash the password
                 java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
                 byte[] digest = md.digest(password.getBytes("UTF-8"));
@@ -563,8 +610,25 @@ public class MusicApiHelper {
                     os.write(postBody.getBytes("UTF-8"));
                     os.close();
 
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    int httpCode = conn.getResponseCode();
+                    MusicLog.api(TAG, "POST", urlStr, httpCode, null);
+
+                    BufferedReader reader;
+                    if (httpCode >= 200 && httpCode < 400) {
+                        reader = new BufferedReader(
+                                new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    } else {
+                        java.io.InputStream errStream = conn.getErrorStream();
+                        if (errStream != null) {
+                            reader = new BufferedReader(
+                                    new InputStreamReader(errStream, "UTF-8"));
+                        } else {
+                            String errMsg = "HTTP " + httpCode;
+                            MusicLog.w(TAG, "密码登录HTTP错误: " + errMsg);
+                            mainHandler.post(() -> callback.onResult(httpCode, errMsg, ""));
+                            return;
+                        }
+                    }
                     StringBuilder sb = new StringBuilder();
                     String line;
                     while ((line = reader.readLine()) != null) {
@@ -572,20 +636,25 @@ public class MusicApiHelper {
                     }
                     reader.close();
 
-                    JSONObject json = new JSONObject(sb.toString());
+                    String responseBody = sb.toString();
+                    MusicLog.api(TAG, "POST-响应", urlStr, httpCode, responseBody);
+
+                    JSONObject json = new JSONObject(responseBody);
                     int code = json.optInt("code", -1);
-                    String message = json.optString("message",
-                            json.optString("msg", ""));
+                    String message = json.optString("message", json.optString("msg", ""));
+                    if (message.isEmpty()) message = "code=" + code;
 
                     String cookieStr = "";
                     if (code == 200) {
                         cookieStr = extractSetCookies(conn);
+                        MusicLog.d(TAG, "密码登录成功，Set-Cookie: " + (cookieStr.isEmpty() ? "(空)" : "已获取"));
                         // Fallback: if Set-Cookie headers are empty, try token from JSON body
                         if ((cookieStr == null || cookieStr.isEmpty() || !cookieStr.contains("MUSIC_U"))
                                 && json.has("token")) {
                             String token = json.optString("token", "");
                             if (!token.isEmpty()) {
                                 cookieStr = "MUSIC_U=" + token;
+                                MusicLog.d(TAG, "密码登录: 从token字段提取Cookie");
                             }
                         }
                         // Also try cookie field in JSON body
@@ -594,17 +663,23 @@ public class MusicApiHelper {
                             String bodyCookie = json.optString("cookie", "");
                             if (!bodyCookie.isEmpty() && bodyCookie.contains("MUSIC_U")) {
                                 cookieStr = bodyCookie;
+                                MusicLog.d(TAG, "密码登录: 从cookie字段提取Cookie");
                             }
                         }
+                    } else {
+                        MusicLog.w(TAG, "密码登录失败: code=" + code + " message=" + message);
                     }
 
                     final String finalCookie = cookieStr;
-                    mainHandler.post(() -> callback.onResult(code, message, finalCookie));
+                    final String finalMsg = message;
+                    mainHandler.post(() -> callback.onResult(code, finalMsg, finalCookie));
                 } finally {
                     conn.disconnect();
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.e(TAG, "密码登录异常", e);
+                String errMsg = e.getMessage() != null ? e.getMessage() : "网络连接失败";
+                mainHandler.post(() -> callback.onError(errMsg));
             }
         });
     }
@@ -621,8 +696,8 @@ public class MusicApiHelper {
                 String lrc = fetchLyrics(songId, cookie);
                 mainHandler.post(() -> callback.onResult(lrc));
             } catch (Exception e) {
-                Log.w(TAG, "Lyrics fetch error", e);
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.w(TAG, "获取歌词失败: " + songId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
@@ -634,7 +709,7 @@ public class MusicApiHelper {
         try {
             return fetchLyrics(songId, cookie);
         } catch (Exception e) {
-            Log.w(TAG, "Lyrics sync fetch error", e);
+            MusicLog.w(TAG, "歌词同步获取失败: " + songId, e);
             return null;
         }
     }
@@ -681,6 +756,7 @@ public class MusicApiHelper {
                     mainHandler.post(() -> callback.onError("请先登录"));
                     return;
                 }
+                MusicLog.op(TAG, "获取云端收藏", "uid=" + uid);
 
                 String csrfToken = extractCsrfToken(cookie);
 
@@ -744,8 +820,8 @@ public class MusicApiHelper {
                 }
                 mainHandler.post(() -> callback.onResult(songs));
             } catch (Exception e) {
-                Log.w(TAG, "Cloud favorites error", e);
-                mainHandler.post(() -> callback.onError("获取云端收藏失败: " + e.getMessage()));
+                MusicLog.w(TAG, "获取云端收藏失败", e);
+                mainHandler.post(() -> callback.onError("获取云端收藏失败: " + (e.getMessage() != null ? e.getMessage() : "未知错误")));
             }
         });
     }
@@ -816,8 +892,8 @@ public class MusicApiHelper {
             }
             mainHandler.post(() -> callback.onResult(songs));
         } catch (Exception e) {
-            Log.w(TAG, "Cloud favorites legacy error", e);
-            mainHandler.post(() -> callback.onError("获取云端收藏失败: " + e.getMessage()));
+            MusicLog.w(TAG, "获取云端收藏(legacy)失败", e);
+            mainHandler.post(() -> callback.onError("获取云端收藏失败: " + (e.getMessage() != null ? e.getMessage() : "未知错误")));
         }
     }
 
@@ -828,6 +904,7 @@ public class MusicApiHelper {
     public static void likeTrack(long trackId, boolean like, String cookie, LikeCallback callback) {
         executor.execute(() -> {
             try {
+                MusicLog.op(TAG, like ? "收藏歌曲" : "取消收藏", "trackId=" + trackId);
                 JSONObject data = new JSONObject();
                 data.put("trackId", trackId);
                 data.put("like", like);
@@ -842,8 +919,8 @@ public class MusicApiHelper {
                 int code = json.optInt("code", -1);
                 mainHandler.post(() -> callback.onResult(code == 200));
             } catch (Exception e) {
-                Log.w(TAG, "Like track error", e);
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.w(TAG, "收藏操作失败: " + trackId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
@@ -877,8 +954,8 @@ public class MusicApiHelper {
                 }
                 mainHandler.post(() -> callback.onResult(idSet));
             } catch (Exception e) {
-                Log.w(TAG, "Cloud liked IDs error", e);
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.w(TAG, "获取云端收藏ID失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
@@ -891,16 +968,18 @@ public class MusicApiHelper {
     public static void getUserAccount(String cookie, AccountCallback callback) {
         executor.execute(() -> {
             try {
+                MusicLog.op(TAG, "获取用户账号信息", null);
                 JSONObject data = new JSONObject();
                 String csrfToken = extractCsrfToken(cookie);
                 data.put("csrf_token", csrfToken);
 
                 String response = weapiPost("/api/w/nuser/account/get", data.toString(), cookie);
+                MusicLog.d(TAG, "获取账号信息响应: " + (response.length() > 200 ? response.substring(0, 200) + "…" : response));
                 JSONObject json = new JSONObject(response);
                 mainHandler.post(() -> callback.onResult(json));
             } catch (Exception e) {
-                Log.w(TAG, "Get account error", e);
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.e(TAG, "获取账号信息失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
@@ -912,16 +991,18 @@ public class MusicApiHelper {
     public static void getVipInfo(String cookie, VipInfoCallback callback) {
         executor.execute(() -> {
             try {
+                MusicLog.op(TAG, "获取VIP信息", null);
                 JSONObject data = new JSONObject();
                 String csrfToken = extractCsrfToken(cookie);
                 data.put("csrf_token", csrfToken);
 
                 String response = weapiPost("/api/music-vip-user/info", data.toString(), cookie);
+                MusicLog.d(TAG, "VIP信息响应: " + (response.length() > 300 ? response.substring(0, 300) + "…" : response));
                 JSONObject json = new JSONObject(response);
                 mainHandler.post(() -> callback.onResult(json));
             } catch (Exception e) {
-                Log.w(TAG, "Get VIP info error", e);
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.w(TAG, "获取VIP信息失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
@@ -948,8 +1029,8 @@ public class MusicApiHelper {
                     mainHandler.post(() -> callback.onError("获取排行榜失败"));
                 }
             } catch (Exception e) {
-                Log.w(TAG, "Top list error", e);
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.w(TAG, "获取排行榜失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
@@ -997,8 +1078,8 @@ public class MusicApiHelper {
                 }
                 mainHandler.post(() -> callback.onResult(songs));
             } catch (Exception e) {
-                Log.w(TAG, "Playlist detail error", e);
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.w(TAG, "获取歌单详情失败: " + playlistId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
@@ -1048,10 +1129,11 @@ public class MusicApiHelper {
                 }
 
                 final List<Song> result = allSongs;
+                MusicLog.d(TAG, "私人漫游获取完成: " + result.size() + " 首");
                 mainHandler.post(() -> callback.onResult(result));
             } catch (Exception e) {
-                Log.w(TAG, "Personal FM error", e);
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                MusicLog.w(TAG, "获取私人漫游失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
@@ -1074,7 +1156,7 @@ public class MusicApiHelper {
                 return account.optLong("id", -1);
             }
         } catch (Exception e) {
-            Log.w(TAG, "Error extracting UID", e);
+            MusicLog.w(TAG, "提取UID失败", e);
         }
         return -1;
     }
@@ -1097,6 +1179,7 @@ public class MusicApiHelper {
         // weapi URL: replace /api/ with /weapi/
         String weapiPath = apiPath.replaceFirst("^/api/", "/weapi/");
         String urlStr = DOMAIN + weapiPath;
+        MusicLog.d(TAG, "weapiPost → " + urlStr);
 
         URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -1115,13 +1198,15 @@ public class MusicApiHelper {
             os.close();
 
             int responseCode = conn.getResponseCode();
+            MusicLog.api(TAG, "POST", urlStr, responseCode, null);
             BufferedReader reader;
             if (responseCode >= 200 && responseCode < 400) {
                 reader = new BufferedReader(
                         new InputStreamReader(conn.getInputStream(), "UTF-8"));
             } else {
+                java.io.InputStream errStream = conn.getErrorStream();
                 reader = new BufferedReader(
-                        new InputStreamReader(conn.getErrorStream(), "UTF-8"));
+                        new InputStreamReader(errStream != null ? errStream : conn.getInputStream(), "UTF-8"));
             }
             StringBuilder sb = new StringBuilder();
             String line;
@@ -1149,6 +1234,7 @@ public class MusicApiHelper {
 
         String weapiPath = apiPath.replaceFirst("^/api/", "/weapi/");
         String urlStr = DOMAIN + weapiPath;
+        MusicLog.d(TAG, "weapiPostMobile → " + urlStr);
 
         URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -1167,13 +1253,15 @@ public class MusicApiHelper {
             os.close();
 
             int responseCode = conn.getResponseCode();
+            MusicLog.api(TAG, "POST(mobile)", urlStr, responseCode, null);
             BufferedReader reader;
             if (responseCode >= 200 && responseCode < 400) {
                 reader = new BufferedReader(
                         new InputStreamReader(conn.getInputStream(), "UTF-8"));
             } else {
+                java.io.InputStream errStream = conn.getErrorStream();
                 reader = new BufferedReader(
-                        new InputStreamReader(conn.getErrorStream(), "UTF-8"));
+                        new InputStreamReader(errStream != null ? errStream : conn.getInputStream(), "UTF-8"));
             }
             StringBuilder sb = new StringBuilder();
             String line;
@@ -1262,6 +1350,17 @@ public class MusicApiHelper {
     }
 
     /**
+     * Mask phone number for safe logging (show first 3 and last 4 digits only).
+     */
+    private static String maskPhone(String phone) {
+        if (phone == null || phone.length() < 7) return "***";
+        int maskCount = Math.max(0, phone.length() - 7);
+        StringBuilder masks = new StringBuilder();
+        for (int i = 0; i < maskCount; i++) masks.append('*');
+        return phone.substring(0, 3) + masks + phone.substring(phone.length() - 4);
+    }
+
+    /**
      * Extract __csrf token from cookie string
      */
     private static String extractCsrfToken(String cookie) {
@@ -1299,5 +1398,122 @@ public class MusicApiHelper {
             }
         }
         return cookieBuilder.toString();
+    }
+
+    // ==================== Song Recognition ====================
+
+    /**
+     * Recognize a song from PCM audio data (听歌识曲).
+     * Sends raw 16-bit LE PCM at 16kHz mono to NetEase's audio matching API.
+     *
+     * @param pcmData  raw PCM bytes (16-bit LE, 16kHz, mono)
+     * @param cookie   user cookie (may be null/empty)
+     * @param callback result callback
+     */
+    public static void recognizeSong(byte[] pcmData, String cookie, RecognitionCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "听歌识曲", "pcm_bytes=" + pcmData.length);
+
+                // Encode PCM as base64
+                String audioBase64 = android.util.Base64.encodeToString(pcmData, android.util.Base64.NO_WRAP);
+
+                JSONObject data = new JSONObject();
+                data.put("audioFP", audioBase64);
+                data.put("from", "songsearch");
+                data.put("sessionId", UUID.randomUUID().toString().replace("-", ""));
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/music/audio/match", data.toString(), cookie);
+                MusicLog.d(TAG, "听歌识曲响应: " + (response.length() > 200 ? response.substring(0, 200) + "…" : response));
+
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                if (code != 200) {
+                    String msg = json.optString("message", "识别失败: code=" + code);
+                    mainHandler.post(() -> callback.onError(msg));
+                    return;
+                }
+
+                JSONObject result = json.optJSONObject("data");
+                if (result == null) result = json.optJSONObject("result");
+                if (result == null) {
+                    mainHandler.post(() -> callback.onError("未识别到歌曲"));
+                    return;
+                }
+
+                // Parse song info from response
+                String songName = result.optString("songName",
+                        result.optString("name", "未知歌曲"));
+                String artist = result.optString("artistName",
+                        result.optString("artist", "未知歌手"));
+                String album = result.optString("albumName",
+                        result.optString("album", ""));
+                long songId = result.optLong("songId", result.optLong("id", 0));
+
+                MusicLog.i(TAG, "听歌识曲成功: " + songName + " - " + artist);
+                mainHandler.post(() -> callback.onResult(songName, artist, album, songId));
+            } catch (Exception e) {
+                MusicLog.e(TAG, "听歌识曲异常", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "识别失败，请重试"));
+            }
+        });
+    }
+
+    /**
+     * Recognize a song from humming PCM audio data (哼歌识曲).
+     * Uses the hum recognition endpoint.
+     *
+     * @param pcmData  raw PCM bytes (16-bit LE, 16kHz, mono)
+     * @param cookie   user cookie (may be null/empty)
+     * @param callback result callback
+     */
+    public static void recognizeHum(byte[] pcmData, String cookie, RecognitionCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "哼歌识曲", "pcm_bytes=" + pcmData.length);
+
+                String audioBase64 = android.util.Base64.encodeToString(pcmData, android.util.Base64.NO_WRAP);
+
+                JSONObject data = new JSONObject();
+                data.put("audioFP", audioBase64);
+                data.put("sessionId", UUID.randomUUID().toString().replace("-", ""));
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/music/audio/hum", data.toString(), cookie);
+                MusicLog.d(TAG, "哼歌识曲响应: " + (response.length() > 200 ? response.substring(0, 200) + "…" : response));
+
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                if (code != 200) {
+                    String msg = json.optString("message", "识别失败: code=" + code);
+                    mainHandler.post(() -> callback.onError(msg));
+                    return;
+                }
+
+                JSONObject result = json.optJSONObject("data");
+                if (result == null) result = json.optJSONObject("result");
+                if (result == null) {
+                    mainHandler.post(() -> callback.onError("未识别到歌曲"));
+                    return;
+                }
+
+                String songName = result.optString("songName",
+                        result.optString("name", "未知歌曲"));
+                String artist = result.optString("artistName",
+                        result.optString("artist", "未知歌手"));
+                String album = result.optString("albumName",
+                        result.optString("album", ""));
+                long songId = result.optLong("songId", result.optLong("id", 0));
+
+                MusicLog.i(TAG, "哼歌识曲成功: " + songName + " - " + artist);
+                mainHandler.post(() -> callback.onResult(songName, artist, album, songId));
+            } catch (Exception e) {
+                MusicLog.e(TAG, "哼歌识曲异常", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "识别失败，请重试"));
+            }
+        });
     }
 }
