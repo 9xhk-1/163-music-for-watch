@@ -284,7 +284,11 @@ public class LyricsActivity extends AppCompatActivity implements MusicPlayerMana
     }
 
     private String buildSongKey(Song song) {
-        return song.getId() + "\u0000" + song.getName() + "\u0000" + song.getArtist();
+        String name = song.getName() != null ? song.getName() : "";
+        String artist = song.getArtist() != null ? song.getArtist() : "";
+        return song.getId()
+                + "#" + name.length() + ":" + name
+                + "#" + artist.length() + ":" + artist;
     }
 
     @Override
