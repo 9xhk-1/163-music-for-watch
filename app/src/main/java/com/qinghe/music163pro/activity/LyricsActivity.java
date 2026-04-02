@@ -94,11 +94,11 @@ public class LyricsActivity extends AppCompatActivity implements MusicPlayerMana
         loadLyrics(song, currentSongKey);
     }
 
-    private void loadLyrics(Song song, String requestSongKey) {
+    private void loadLyrics(Song song, String songKeyAtRequestTime) {
         // Try to load from local .lrc file first
         String localLrc = loadLocalLrc(song);
         if (localLrc != null && !localLrc.isEmpty()) {
-            if (!requestSongKey.equals(currentSongKey)) {
+            if (!songKeyAtRequestTime.equals(currentSongKey)) {
                 return;
             }
             parseLrc(localLrc);
@@ -117,7 +117,7 @@ public class LyricsActivity extends AppCompatActivity implements MusicPlayerMana
         MusicApiHelper.getLyrics(song.getId(), cookie, new MusicApiHelper.LyricsCallback() {
             @Override
             public void onResult(String lrcText) {
-                if (!requestSongKey.equals(currentSongKey)) {
+                if (!songKeyAtRequestTime.equals(currentSongKey)) {
                     return;
                 }
                 if (lrcText == null || lrcText.isEmpty()) {
@@ -131,7 +131,7 @@ public class LyricsActivity extends AppCompatActivity implements MusicPlayerMana
 
             @Override
             public void onError(String message) {
-                if (!requestSongKey.equals(currentSongKey)) {
+                if (!songKeyAtRequestTime.equals(currentSongKey)) {
                     return;
                 }
                 showNoLyrics();
@@ -284,7 +284,7 @@ public class LyricsActivity extends AppCompatActivity implements MusicPlayerMana
     }
 
     private String buildSongKey(Song song) {
-        return song.getId() + "|" + song.getName() + "|" + song.getArtist();
+        return song.getId() + "\u0000" + song.getName() + "\u0000" + song.getArtist();
     }
 
     @Override
