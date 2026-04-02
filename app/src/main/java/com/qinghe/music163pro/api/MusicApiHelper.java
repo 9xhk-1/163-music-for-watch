@@ -428,7 +428,6 @@ public class MusicApiHelper {
                 JSONObject data = new JSONObject();
                 data.put("ctcode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
                 data.put("cellphone", phone);
-                data.put("checkToken", "");
 
                 String response = weapiPostMobile("/api/sms/captcha/sent", data.toString(), null);
                 JSONObject json = new JSONObject(response);
@@ -457,6 +456,8 @@ public class MusicApiHelper {
                 MusicLog.op(TAG, "短信登录", "phone=" + maskPhone(phone));
 
                 JSONObject data = new JSONObject();
+                data.put("type", "1");
+                data.put("https", "true");
                 data.put("phone", phone);
                 data.put("countrycode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
                 data.put("captcha", captcha);
@@ -466,7 +467,7 @@ public class MusicApiHelper {
                 String postBody = "params=" + URLEncoder.encode(encrypted[0], "UTF-8")
                         + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
 
-                String urlStr = DOMAIN + "/weapi/login/cellphone";
+                String urlStr = DOMAIN + "/weapi/w/login/cellphone";
                 MusicLog.i(TAG, "[REQ] POST(sms-login) " + urlStr + "\n  请求体(原文): " + data);
                 URL url = new URL(urlStr);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -583,6 +584,8 @@ public class MusicApiHelper {
                 String md5Password = hexString.toString();
 
                 JSONObject data = new JSONObject();
+                data.put("type", "1");
+                data.put("https", "true");
                 data.put("phone", phone);
                 data.put("countrycode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
                 data.put("password", md5Password);
@@ -592,7 +595,7 @@ public class MusicApiHelper {
                 String postBody = "params=" + URLEncoder.encode(encrypted[0], "UTF-8")
                         + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
 
-                String urlStr = DOMAIN + "/weapi/login/cellphone";
+                String urlStr = DOMAIN + "/weapi/w/login/cellphone";
                 // Log request (hide actual MD5 hash for security)
                 MusicLog.i(TAG, "[REQ] POST(pwd-login) " + urlStr + "\n  请求体(原文): {phone=" + maskPhone(phone) + ", countrycode=86, password=[MD5已隐藏], rememberLogin=true}");
                 URL url = new URL(urlStr);
