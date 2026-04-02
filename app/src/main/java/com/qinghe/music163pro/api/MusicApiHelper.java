@@ -34,6 +34,7 @@ public class MusicApiHelper {
 
     private static final String WEAPI_BASE = "https://music.163.com/weapi";
     private static final String DOMAIN = "https://music.163.com";
+    private static final String SONG_COMMENT_THREAD_PREFIX = "R_SO_4_";
 
     private static final String USER_AGENT =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
@@ -1253,7 +1254,7 @@ public class MusicApiHelper {
                                     String cursor, String cookie, CommentCallback callback) {
         executor.execute(() -> {
             try {
-                String threadId = "R_SO_4_" + songId;
+                String threadId = SONG_COMMENT_THREAD_PREFIX + songId;
                 JSONObject data = new JSONObject();
                 data.put("threadId", threadId);
                 data.put("pageNo", pageNo);
@@ -1297,7 +1298,7 @@ public class MusicApiHelper {
     public static void postComment(long songId, String content, String cookie, CommentActionCallback callback) {
         executor.execute(() -> {
             try {
-                String threadId = "R_SO_4_" + songId;
+                String threadId = SONG_COMMENT_THREAD_PREFIX + songId;
                 JSONObject data = new JSONObject();
                 data.put("threadId", threadId);
                 data.put("content", content);
@@ -1320,7 +1321,7 @@ public class MusicApiHelper {
     public static void replyComment(long songId, long commentId, String content, String cookie, CommentActionCallback callback) {
         executor.execute(() -> {
             try {
-                String threadId = "R_SO_4_" + songId;
+                String threadId = SONG_COMMENT_THREAD_PREFIX + songId;
                 JSONObject data = new JSONObject();
                 data.put("threadId", threadId);
                 data.put("commentId", commentId);
@@ -1345,7 +1346,7 @@ public class MusicApiHelper {
     public static void likeComment(long songId, long commentId, boolean like, String cookie, CommentActionCallback callback) {
         executor.execute(() -> {
             try {
-                String threadId = "R_SO_4_" + songId;
+                String threadId = SONG_COMMENT_THREAD_PREFIX + songId;
                 String action = like ? "like" : "unlike";
                 JSONObject data = new JSONObject();
                 data.put("threadId", threadId);
@@ -1370,7 +1371,7 @@ public class MusicApiHelper {
                                          String cookie, CommentCallback callback) {
         executor.execute(() -> {
             try {
-                String threadId = "R_SO_4_" + songId;
+                String threadId = SONG_COMMENT_THREAD_PREFIX + songId;
                 JSONObject data = new JSONObject();
                 data.put("parentCommentId", parentCommentId);
                 data.put("threadId", threadId);
@@ -1390,6 +1391,21 @@ public class MusicApiHelper {
 
     // ==================== Lyrics with Translation ====================
 
+    private static JSONObject buildLyricRequestData(long songId, String cookie) throws Exception {
+        JSONObject data = new JSONObject();
+        data.put("id", songId);
+        data.put("cp", false);
+        data.put("tv", 0);
+        data.put("lv", 0);
+        data.put("rv", 0);
+        data.put("kv", 0);
+        data.put("yv", 0);
+        data.put("ytv", 0);
+        data.put("yrv", 0);
+        data.put("csrf_token", extractCsrfToken(cookie));
+        return data;
+    }
+
     /**
      * Fetch lyrics with translation for a song by its ID.
      * Returns both original LRC and translated LRC (tlyric).
@@ -1397,18 +1413,7 @@ public class MusicApiHelper {
     public static void getLyricsWithTranslation(long songId, String cookie, LyricsFullCallback callback) {
         executor.execute(() -> {
             try {
-                JSONObject data = new JSONObject();
-                data.put("id", songId);
-                data.put("cp", false);
-                data.put("tv", 0);
-                data.put("lv", 0);
-                data.put("rv", 0);
-                data.put("kv", 0);
-                data.put("yv", 0);
-                data.put("ytv", 0);
-                data.put("yrv", 0);
-                String csrfToken = extractCsrfToken(cookie);
-                data.put("csrf_token", csrfToken);
+                JSONObject data = buildLyricRequestData(songId, cookie);
                 String response = weapiPost("/api/song/lyric/v1", data.toString(), cookie);
                 JSONObject json = new JSONObject(response);
                 String lrc = "";
@@ -1437,18 +1442,7 @@ public class MusicApiHelper {
      */
     public static String fetchTranslatedLyricsSync(long songId, String cookie) {
         try {
-            JSONObject data = new JSONObject();
-            data.put("id", songId);
-            data.put("cp", false);
-            data.put("tv", 0);
-            data.put("lv", 0);
-            data.put("rv", 0);
-            data.put("kv", 0);
-            data.put("yv", 0);
-            data.put("ytv", 0);
-            data.put("yrv", 0);
-            String csrfToken = extractCsrfToken(cookie);
-            data.put("csrf_token", csrfToken);
+            JSONObject data = buildLyricRequestData(songId, cookie);
             String response = weapiPost("/api/song/lyric/v1", data.toString(), cookie);
             JSONObject json = new JSONObject(response);
             JSONObject tlyricObj = json.optJSONObject("tlyric");
