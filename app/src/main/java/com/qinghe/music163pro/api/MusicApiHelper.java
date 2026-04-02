@@ -445,9 +445,9 @@ public class MusicApiHelper {
     }
 
     /**
-     * Login with phone number and SMS captcha
-     * (same as NeteaseCloudMusicApiBackup module/login_cellphone.js)
-     * Uses mobile cookie and weapi encryption.
+     * Login with phone number and SMS captcha.
+     * Per NeteaseCloudMusic_PythonSDK: login_cellphone(phone, captcha=captcha, countrycode=ctcode)
+     * → POST /weapi/w/login/cellphone with {type:'1', https:'true', phone, countrycode, captcha, rememberLogin:'true'}
      */
     public static void loginByCellphone(String phone, String captcha, String ctcode,
                                          LoginCallback callback) {
@@ -1410,11 +1410,12 @@ public class MusicApiHelper {
 
     /**
      * Recognize a song from PCM audio data (听歌识曲).
-     * (NeteaseCloudMusicApiBackup module/audio_match.js)
+     * Per NeteaseCloudMusic_PythonSDK: audio_match(duration, audioFP) → /audio/match
      * GET https://interface.music.163.com/api/music/audio/match
-     *   ?sessionId=0123456789abcdef&algorithmCode=shazam_v2&duration={sec}&rawdata={base64}&times=1&decrypt=1
+     *   ?sessionId=0123456789abcdef&algorithmCode=shazam_v2&duration={sec}&rawdata={audioFP}&times=1&decrypt=1
+     * Response: {code, data: {result: {songId, songName, artists:[{name}], album:{name}}}}
      *
-     * @param pcmData  raw PCM bytes (16-bit LE, 16kHz, mono)
+     * @param pcmData  raw PCM bytes (16-bit LE, 16kHz, mono) — this is the audioFP/rawdata
      * @param cookie   user cookie (may be null/empty, not required)
      * @param callback result callback
      */
@@ -1468,19 +1469,22 @@ public class MusicApiHelper {
                     MusicLog.api(TAG, "GET", "audio/match", responseCode, response);
 
                     JSONObject json = new JSONObject(response);
-                    JSONObject result = json.optJSONObject("data");
+                    // Response structure: {code, data: {result: {songId, songName, artists:[{name}], album:{name}}}}
+                    JSONObject dataObj = json.optJSONObject("data");
+                    JSONObject result = dataObj != null ? dataObj.optJSONObject("result") : null;
                     if (result == null) {
                         mainHandler.post(() -> callback.onError("未识别到歌曲"));
                         return;
                     }
 
-                    String songName = result.optString("songName",
-                            result.optString("name", "未知歌曲"));
-                    String artist = result.optString("artistName",
-                            result.optString("artist", "未知歌手"));
-                    String album = result.optString("albumName",
-                            result.optString("album", ""));
-                    long songId = result.optLong("songId", result.optLong("id", 0));
+                    String songName = result.optString("songName", "未知歌曲");
+                    org.json.JSONArray artists = result.optJSONArray("artists");
+                    String artist = (artists != null && artists.length() > 0)
+                            ? artists.getJSONObject(0).optString("name", "未知歌手")
+                            : "未知歌手";
+                    JSONObject albumObj = result.optJSONObject("album");
+                    String album = albumObj != null ? albumObj.optString("name", "") : "";
+                    long songId = result.optLong("songId", 0);
 
                     MusicLog.i(TAG, "听歌识曲成功: " + songName + " - " + artist);
                     mainHandler.post(() -> callback.onResult(songName, artist, album, songId));
@@ -1549,19 +1553,22 @@ public class MusicApiHelper {
                     MusicLog.api(TAG, "GET", "audio/hum", responseCode, response);
 
                     JSONObject json = new JSONObject(response);
-                    JSONObject result = json.optJSONObject("data");
+                    // Same response structure as audio/match: {code, data: {result: {songId, songName, artists, album}}}
+                    JSONObject dataObj = json.optJSONObject("data");
+                    JSONObject result = dataObj != null ? dataObj.optJSONObject("result") : null;
                     if (result == null) {
                         mainHandler.post(() -> callback.onError("未识别到歌曲"));
                         return;
                     }
 
-                    String songName = result.optString("songName",
-                            result.optString("name", "未知歌曲"));
-                    String artist = result.optString("artistName",
-                            result.optString("artist", "未知歌手"));
-                    String album = result.optString("albumName",
-                            result.optString("album", ""));
-                    long songId = result.optLong("songId", result.optLong("id", 0));
+                    String songName = result.optString("songName", "未知歌曲");
+                    org.json.JSONArray artists = result.optJSONArray("artists");
+                    String artist = (artists != null && artists.length() > 0)
+                            ? artists.getJSONObject(0).optString("name", "未知歌手")
+                            : "未知歌手";
+                    JSONObject albumObj = result.optJSONObject("album");
+                    String album = albumObj != null ? albumObj.optString("name", "") : "";
+                    long songId = result.optLong("songId", 0);
 
                     MusicLog.i(TAG, "哼歌识曲成功: " + songName + " - " + artist);
                     mainHandler.post(() -> callback.onResult(songName, artist, album, songId));
