@@ -496,7 +496,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 v -> onFuncComments(song)));
         contentLayout.addView(row4);
 
-        // Row 5: 播放列表
+        // Row 5: 播放列表 + 添加到歌单
         LinearLayout row5 = new LinearLayout(this);
         row5.setOrientation(LinearLayout.HORIZONTAL);
         row5.setGravity(Gravity.CENTER);
@@ -506,10 +506,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         row5.addView(createFuncItem("📋", "播放列表",
                 v -> onFuncShowPlaylist()));
-        // Empty placeholder for alignment
-        LinearLayout placeholder = new LinearLayout(this);
-        placeholder.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        row5.addView(placeholder);
+        row5.addView(createFuncItem("➕", "添加到歌单",
+                v -> onFuncAddToPlaylist(song)));
         contentLayout.addView(row5);
 
         scrollView.addView(contentLayout);
@@ -818,6 +816,85 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         intent.putExtra("song_name", song.getName());
         intent.putExtra("cookie", playerManager.getCookie());
         startActivity(intent);
+    }
+
+    /**
+     * Add current song to a user-created playlist (not "我喜欢的音乐").
+     * Fetches user playlists, filters to only user-created (non-liked), shows picker.
+     */
+    private void onFuncAddToPlaylist(Song song) {
+        String cookie = playerManager.getCookie();
+        if (cookie == null || cookie.isEmpty() || !cookie.contains("MUSIC_U")) {
+            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(this, "正在加载歌单...", Toast.LENGTH_SHORT).show();
+        MusicApiHelper.getUid(cookie, new MusicApiHelper.AccountCallback() {
+            @Override
+            public void onResult(org.json.JSONObject uidJson) {
+                long myUid = uidJson.optLong("uid", -1);
+                MusicApiHelper.getUserPlaylists(cookie, new MusicApiHelper.UserPlaylistsCallback() {
+                    @Override
+                    public void onResult(java.util.List<com.qinghe.music163pro.model.PlaylistInfo> playlists) {
+                        // Filter: only my created playlists, exclude "我喜欢的音乐"
+                        java.util.List<com.qinghe.music163pro.model.PlaylistInfo> eligible = new java.util.ArrayList<>();
+                        for (com.qinghe.music163pro.model.PlaylistInfo p : playlists) {
+                            if (p.getUserId() == myUid && !p.isLikedPlaylist()) {
+                                eligible.add(p);
+                            }
+                        }
+                        if (eligible.isEmpty()) {
+                            Toast.makeText(MainActivity.this, "没有可用的自建歌单", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        showPlaylistPicker(eligible, song);
+                    }
+                    @Override
+                    public void onError(String message) {
+                        Toast.makeText(MainActivity.this, "获取歌单失败: " + message, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+            @Override
+            public void onError(String message) {
+                Toast.makeText(MainActivity.this, "获取用户信息失败", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void showPlaylistPicker(java.util.List<com.qinghe.music163pro.model.PlaylistInfo> playlists, Song song) {
+        String[] names = new String[playlists.size()];
+        for (int i = 0; i < playlists.size(); i++) {
+            names[i] = playlists.get(i).getName() + " (" + playlists.get(i).getTrackCount() + "首)";
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("添加到歌单")
+                .setItems(names, (dialog, which) -> {
+                    com.qinghe.music163pro.model.PlaylistInfo selected = playlists.get(which);
+                    addSongToPlaylist(song, selected);
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void addSongToPlaylist(Song song, com.qinghe.music163pro.model.PlaylistInfo playlist) {
+        String cookie = playerManager.getCookie();
+        MusicApiHelper.playlistTracks("add", playlist.getId(), new long[]{song.getId()},
+                cookie, new MusicApiHelper.PlaylistActionCallback() {
+            @Override
+            public void onResult(boolean success) {
+                if (success) {
+                    Toast.makeText(MainActivity.this,
+                            "已添加到「" + playlist.getName() + "」", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(MainActivity.this, "添加失败", Toast.LENGTH_SHORT).show();
+                }
+            }
+            @Override
+            public void onError(String message) {
+                Toast.makeText(MainActivity.this, "添加失败: " + message, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     // ==================== Lyrics Overlay ====================
