@@ -327,6 +327,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         if (playerManager.isPlaying()) {
             startSeekBarUpdate();
         }
+        // Restart lyrics scroll sync if lyrics overlay is visible
+        if (lyricsOverlayShowing && !lyricLines.isEmpty() && tvLyricsTimeRef != null) {
+            startLyricsScrollSync(tvLyricsTimeRef);
+        }
     }
 
     // ==================== Functions Overlay ====================

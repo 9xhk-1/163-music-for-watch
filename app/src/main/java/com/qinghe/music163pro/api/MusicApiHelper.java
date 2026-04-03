@@ -165,6 +165,11 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface SongDetailCallback {
+        void onResult(JSONObject songDetail);
+        void onError(String message);
+    }
+
     public interface ArtistDescCallback {
         void onResult(String briefDesc, JSONArray introduction);
         void onError(String message);
@@ -1204,11 +1209,47 @@ public class MusicApiHelper {
         return -1;
     }
 
+    // ==================== Song Detail ====================
+
+    /**
+     * Get detailed song info via /api/v3/song/detail.
+     * Returns full song metadata including duration, album info, artist info, etc.
+     */
+    public static void getSongDetail(long songId, String cookie, SongDetailCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "获取歌曲详情", "songId=" + songId);
+                JSONArray songIds = new JSONArray();
+                JSONObject idObj = new JSONObject();
+                idObj.put("id", songId);
+                songIds.put(idObj);
+
+                JSONObject data = new JSONObject();
+                data.put("c", songIds.toString());
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/v3/song/detail", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONArray songs = json.optJSONArray("songs");
+                if (songs != null && songs.length() > 0) {
+                    mainHandler.post(() -> callback.onResult(songs.optJSONObject(0)));
+                } else {
+                    mainHandler.post(() -> callback.onError("未找到歌曲信息"));
+                }
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取歌曲详情失败: " + songId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
     // ==================== Song Wiki ====================
 
     public static void getSongWikiSummary(long songId, String cookie, SongWikiCallback callback) {
         executor.execute(() -> {
             try {
+                MusicLog.op(TAG, "获取歌曲百科", "songId=" + songId);
                 JSONObject data = new JSONObject();
                 data.put("songId", songId);
                 String csrfToken = extractCsrfToken(cookie);
@@ -1228,6 +1269,7 @@ public class MusicApiHelper {
     public static void getArtistDesc(long artistId, String cookie, ArtistDescCallback callback) {
         executor.execute(() -> {
             try {
+                MusicLog.op(TAG, "获取歌手百科", "artistId=" + artistId);
                 JSONObject data = new JSONObject();
                 data.put("id", artistId);
                 String csrfToken = extractCsrfToken(cookie);
