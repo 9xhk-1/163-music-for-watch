@@ -649,7 +649,7 @@ public class SongInfoActivity extends AppCompatActivity {
 
             if (isSongBlock) {
                 long resId = resInfo != null ? resInfo.optLong("id", 0) : 0;
-                if (resId <= 0) resId = resource.optLong("id", 0);
+                if (resId <= 0) resId = parseResourceId(resource);
                 String resName = resInfo != null ? resInfo.optString("name", "") : "";
                 if (resName.isEmpty() && resUiElement != null) {
                     JSONObject mt = resUiElement.optJSONObject("mainTitle");
@@ -674,7 +674,7 @@ public class SongInfoActivity extends AppCompatActivity {
             } else if (isPlaylistBlock) {
                 long plId = resInfo != null ? resInfo.optLong("id", 0) : 0;
                 if (plId <= 0 && extInfo != null) plId = extInfo.optLong("id", 0);
-                if (plId <= 0) plId = resource.optLong("id", 0);
+                if (plId <= 0) plId = parseResourceId(resource);
                 card.addView(makeSmallLabel("📋 点击加入播放列表"));
                 final long finalPlId = plId;
                 if (finalPlId > 0) {
@@ -693,6 +693,19 @@ public class SongInfoActivity extends AppCompatActivity {
             return String.format(Locale.getDefault(), "%.1f万", count / 10000.0);
         }
         return String.valueOf(count);
+    }
+
+    /** Parse resource ID trying numeric 'id' field first, then 'resourceId' string. */
+    private long parseResourceId(JSONObject resource) {
+        // Try numeric id first
+        long id = resource.optLong("id", 0);
+        if (id > 0) return id;
+        // Try resourceId string field (common in wiki API responses)
+        String rid = resource.optString("resourceId", "");
+        if (!rid.isEmpty()) {
+            try { return Long.parseLong(rid); } catch (NumberFormatException ignored) {}
+        }
+        return 0;
     }
 
     private void displayUiElement(JSONObject uiElement) {
