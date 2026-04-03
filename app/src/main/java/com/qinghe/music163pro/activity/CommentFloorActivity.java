@@ -591,6 +591,41 @@ public class CommentFloorActivity extends AppCompatActivity {
 
         item.addView(footer);
 
+        // Long-press to delete sub-comment (with confirmation)
+        final String displayNick = nickname;
+        final String displayContent = content;
+        item.setOnLongClickListener(v -> {
+            String preview = displayContent.length() > 40
+                    ? displayContent.substring(0, 40) + "..." : displayContent;
+            showConfirmDialog("删除评论",
+                    "确定删除「" + displayNick + "」的评论？\n\n" + preview, () -> {
+                MusicApiHelper.deleteComment(songId, commentId, cookie,
+                        new MusicApiHelper.CommentActionCallback() {
+                            @Override
+                            public void onResult(boolean success) {
+                                runOnUiThread(() -> {
+                                    if (success) {
+                                        Toast.makeText(CommentFloorActivity.this,
+                                                "评论已删除", Toast.LENGTH_SHORT).show();
+                                        loadFloorComments(true);
+                                    } else {
+                                        Toast.makeText(CommentFloorActivity.this,
+                                                "删除失败（可能不是自己的评论）",
+                                                Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public void onError(String message) {
+                                runOnUiThread(() -> Toast.makeText(CommentFloorActivity.this,
+                                        "删除失败: " + message, Toast.LENGTH_SHORT).show());
+                            }
+                        });
+            });
+            return true;
+        });
+
         return item;
     }
 
@@ -801,5 +836,95 @@ public class CommentFloorActivity extends AppCompatActivity {
     private int px(int baseValue) {
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
         return (int) (baseValue * screenWidth / 320f + 0.5f);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Confirm Dialog
+    // ──────────────────────────────────────────────────────
+
+    private void showConfirmDialog(String title, String message, Runnable onConfirm) {
+        android.widget.FrameLayout rootView = findViewById(android.R.id.content);
+
+        android.widget.FrameLayout overlay = new android.widget.FrameLayout(this);
+        overlay.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+        overlay.setBackgroundColor(0xCC333333);
+
+        LinearLayout dialog = new LinearLayout(this);
+        dialog.setOrientation(LinearLayout.VERTICAL);
+        dialog.setBackgroundColor(0xFF424242);
+        dialog.setPadding(px(16), px(12), px(16), px(12));
+        android.widget.FrameLayout.LayoutParams dlgParams = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+        dlgParams.gravity = Gravity.CENTER;
+        dlgParams.leftMargin = px(16);
+        dlgParams.rightMargin = px(16);
+        dialog.setLayoutParams(dlgParams);
+
+        // Title
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(0xFFFFFFFF);
+        tvTitle.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(18));
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, px(6));
+        dialog.addView(tvTitle);
+
+        // Message
+        TextView tvMessage = new TextView(this);
+        tvMessage.setText(message);
+        tvMessage.setTextColor(0xFFCCCCCC);
+        tvMessage.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
+        tvMessage.setGravity(Gravity.CENTER);
+        tvMessage.setPadding(0, 0, 0, px(12));
+        dialog.addView(tvMessage);
+
+        // Buttons row
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setGravity(Gravity.CENTER);
+        dialog.addView(btnRow);
+
+        // Cancel button
+        TextView btnCancel = new TextView(this);
+        btnCancel.setText("取消");
+        btnCancel.setTextColor(0xFFFFFFFF);
+        btnCancel.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnCancel.setGravity(Gravity.CENTER);
+        btnCancel.setPadding(px(12), px(8), px(12), px(8));
+        btnCancel.setBackgroundColor(0xFF616161);
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        cancelParams.rightMargin = px(4);
+        btnCancel.setLayoutParams(cancelParams);
+        btnCancel.setClickable(true);
+        btnCancel.setFocusable(true);
+        btnCancel.setOnClickListener(v -> rootView.removeView(overlay));
+        btnRow.addView(btnCancel);
+
+        // Confirm button
+        TextView btnConfirm = new TextView(this);
+        btnConfirm.setText("确定");
+        btnConfirm.setTextColor(0xFFFFFFFF);
+        btnConfirm.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnConfirm.setGravity(Gravity.CENTER);
+        btnConfirm.setPadding(px(12), px(8), px(12), px(8));
+        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        confirmParams.leftMargin = px(4);
+        btnConfirm.setLayoutParams(confirmParams);
+        btnConfirm.setClickable(true);
+        btnConfirm.setFocusable(true);
+        btnConfirm.setOnClickListener(v -> {
+            rootView.removeView(overlay);
+            onConfirm.run();
+        });
+        btnRow.addView(btnConfirm);
+
+        overlay.addView(dialog);
+        rootView.addView(overlay);
     }
 }

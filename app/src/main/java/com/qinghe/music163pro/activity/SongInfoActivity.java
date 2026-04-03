@@ -349,6 +349,12 @@ public class SongInfoActivity extends AppCompatActivity {
                 displayCreative(creative);
             }
         }
+
+        // Some blocks store data directly in extInfo (e.g. 回忆坐标, 歌单)
+        JSONObject extInfo = block.optJSONObject("extInfo");
+        if (extInfo != null && (creatives == null || creatives.length() == 0)) {
+            displayExtInfo(extInfo);
+        }
     }
 
     private String getBlockTitle(String blockCode) {
@@ -362,6 +368,9 @@ public class SongInfoActivity extends AppCompatActivity {
             case "SONG_PLAY_ABOUT_TOPIC_BLOCK": return "\uD83D\uDCAC 相关话题";
             case "SONG_PLAY_ABOUT_REC_SONG_BLOCK": return "\uD83D\uDD04 推荐歌曲";
             case "SONG_PLAY_ABOUT_SONG_WIKI_BLOCK": return "\uD83D\uDCD6 歌曲百科";
+            case "SONG_PLAY_ABOUT_PLAYLIST_BLOCK": return "\uD83D\uDCCB 相关歌单";
+            case "SONG_PLAY_ABOUT_MEMORY_BLOCK": return "\uD83D\uDCCC 回忆坐标";
+            case "SONG_PLAY_ABOUT_SIMILAR_WIKI_BLOCK": return "\uD83D\uDD0D 音乐百科相似";
             default:
                 // Show cleaned-up block code
                 String cleaned = blockCode.replace("SONG_PLAY_ABOUT_", "")
@@ -401,9 +410,86 @@ public class SongInfoActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Display extInfo data from a block (used by 回忆坐标, 歌单 etc.)
+     */
+    private void displayExtInfo(JSONObject extInfo) {
+        try {
+            // Some extInfo contains songs array
+            JSONArray songs = extInfo.optJSONArray("songs");
+            if (songs != null) {
+                for (int i = 0; i < songs.length(); i++) {
+                    JSONObject song = songs.optJSONObject(i);
+                    if (song == null) continue;
+                    String sName = song.optString("name", "");
+                    JSONArray ar = song.optJSONArray("ar");
+                    String sArtist = "";
+                    if (ar != null && ar.length() > 0) {
+                        sArtist = ar.optJSONObject(0).optString("name", "");
+                    }
+                    if (!sName.isEmpty()) {
+                        String display = sArtist.isEmpty() ? sName : sName + " - " + sArtist;
+                        contentLayout.addView(makeText("• " + display, COLOR_TEXT_DESC, px(14), false, Gravity.START));
+                        contentLayout.addView(makeSpacer(px(2)));
+                    }
+                }
+                return;
+            }
+
+            // Some extInfo contains playlists array
+            JSONArray playlists = extInfo.optJSONArray("playlists");
+            if (playlists != null) {
+                for (int i = 0; i < playlists.length(); i++) {
+                    JSONObject pl = playlists.optJSONObject(i);
+                    if (pl == null) continue;
+                    String plName = pl.optString("name", "");
+                    int playCount = pl.optInt("playCount", 0);
+                    if (!plName.isEmpty()) {
+                        String display = plName;
+                        if (playCount > 0) {
+                            display += "  ▶ " + formatCount(playCount);
+                        }
+                        contentLayout.addView(makeText("• " + display, COLOR_TEXT_DESC, px(14), false, Gravity.START));
+                        contentLayout.addView(makeSpacer(px(2)));
+                    }
+                }
+                return;
+            }
+
+            // Some extInfo has direct text content (回忆坐标 etc.)
+            String text = extInfo.optString("text", "");
+            if (!text.isEmpty()) {
+                contentLayout.addView(makeText(text, COLOR_TEXT_DESC, px(14), false, Gravity.START));
+                return;
+            }
+
+            // Try to display any top-level string values
+            Iterator<String> keys = extInfo.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                Object val = extInfo.opt(key);
+                if (val == null) continue;
+                String valStr = val.toString();
+                if (valStr.isEmpty() || "null".equals(valStr)) continue;
+                if (valStr.startsWith("{") || valStr.startsWith("[")) continue;
+                if (valStr.length() > 300) continue;
+                contentLayout.addView(makeText(valStr, COLOR_TEXT_DESC, px(13), false, Gravity.START));
+                contentLayout.addView(makeSpacer(px(2)));
+            }
+        } catch (Exception e) {
+            MusicLog.e(TAG, "解析extInfo失败", e);
+        }
+    }
+
     private void displayResource(JSONObject resource) {
+        // Try resourceInfo first (used by song/artist/album blocks)
         JSONObject resInfo = resource.optJSONObject("resourceInfo");
-        if (resInfo == null) return;
+
+        // Also check for resource-level uiElement (used by 回忆坐标, 相似歌曲, 歌单 etc.)
+        JSONObject resUiElement = resource.optJSONObject("uiElement");
+
+        // If neither exists, nothing to show
+        if (resInfo == null && resUiElement == null) return;
 
         // Create a card for each resource
         LinearLayout card = new LinearLayout(this);
@@ -418,70 +504,123 @@ public class SongInfoActivity extends AppCompatActivity {
         cardParams.setMargins(0, px(3), 0, px(3));
         card.setLayoutParams(cardParams);
 
-        // Name
-        String name = resInfo.optString("name", "");
-        if (!name.isEmpty()) {
-            card.addView(makeText(name, COLOR_TEXT_PRIMARY, px(15), true, Gravity.START));
-        }
-
-        // ID
-        long id = resInfo.optLong("id", 0);
-        if (id > 0) {
-            card.addView(makeSmallLabel("ID: " + id));
-        }
-
-        // Artists
-        JSONArray artists = resInfo.optJSONArray("artist");
-        if (artists != null && artists.length() > 0) {
-            StringBuilder artistStr = new StringBuilder();
-            for (int a = 0; a < artists.length(); a++) {
-                JSONObject art = artists.optJSONObject(a);
-                if (art == null) continue;
-                if (artistStr.length() > 0) artistStr.append(" / ");
-                artistStr.append(art.optString("name", ""));
-                // Capture artist ID for later
-                if (a == 0 && artistId <= 0) {
-                    artistId = art.optLong("id", 0);
+        // Display from uiElement if present (common in many block types)
+        if (resUiElement != null) {
+            JSONObject mainTitle = resUiElement.optJSONObject("mainTitle");
+            if (mainTitle != null) {
+                String title = mainTitle.optString("title", "");
+                if (!title.isEmpty()) {
+                    card.addView(makeText(title, COLOR_TEXT_PRIMARY, px(15), true, Gravity.START));
                 }
             }
-            card.addView(makeSmallLabel("歌手: " + artistStr.toString()));
-        }
-
-        // Album
-        JSONObject album = resInfo.optJSONObject("album");
-        if (album != null) {
-            String albumName = album.optString("name", "");
-            if (!albumName.isEmpty()) {
-                card.addView(makeSmallLabel("专辑: " + albumName));
+            JSONObject subTitle = resUiElement.optJSONObject("subTitle");
+            if (subTitle != null) {
+                String title = subTitle.optString("title", "");
+                if (!title.isEmpty()) {
+                    card.addView(makeSmallLabel(title));
+                }
+            }
+            String ueDesc = resUiElement.optString("description", "");
+            if (!ueDesc.isEmpty()) {
+                card.addView(makeText(ueDesc, COLOR_TEXT_DESC, px(13), false, Gravity.START));
+            }
+            // Image text (used by some blocks)
+            JSONObject image = resUiElement.optJSONObject("image");
+            if (image != null) {
+                String imageText = image.optString("title", "");
+                if (!imageText.isEmpty()) {
+                    card.addView(makeSmallLabel(imageText));
+                }
             }
         }
 
-        // Description
-        String desc = resInfo.optString("desc", "");
-        if (!desc.isEmpty()) {
-            card.addView(makeSpacer(px(3)));
-            card.addView(makeText(desc, COLOR_TEXT_DESC, px(13), false, Gravity.START));
+        // Display from resourceInfo if present
+        if (resInfo != null) {
+            // Name
+            String name = resInfo.optString("name", "");
+            if (!name.isEmpty()) {
+                // Avoid duplicate if uiElement already showed a title
+                if (resUiElement == null || resUiElement.optJSONObject("mainTitle") == null) {
+                    card.addView(makeText(name, COLOR_TEXT_PRIMARY, px(15), true, Gravity.START));
+                }
+            }
+
+            // Artists
+            JSONArray artists = resInfo.optJSONArray("artist");
+            if (artists != null && artists.length() > 0) {
+                StringBuilder artistStr = new StringBuilder();
+                for (int a = 0; a < artists.length(); a++) {
+                    JSONObject art = artists.optJSONObject(a);
+                    if (art == null) continue;
+                    if (artistStr.length() > 0) artistStr.append(" / ");
+                    artistStr.append(art.optString("name", ""));
+                    if (a == 0 && artistId <= 0) {
+                        artistId = art.optLong("id", 0);
+                    }
+                }
+                card.addView(makeSmallLabel("歌手: " + artistStr.toString()));
+            }
+
+            // Album
+            JSONObject album = resInfo.optJSONObject("album");
+            if (album != null) {
+                String albumName = album.optString("name", "");
+                if (!albumName.isEmpty()) {
+                    card.addView(makeSmallLabel("专辑: " + albumName));
+                }
+            }
+
+            // Description
+            String desc = resInfo.optString("desc", "");
+            if (!desc.isEmpty()) {
+                card.addView(makeSpacer(px(3)));
+                card.addView(makeText(desc, COLOR_TEXT_DESC, px(13), false, Gravity.START));
+            }
         }
 
-        // Iterate all other string fields
-        Iterator<String> keys = resInfo.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            // Skip already handled and non-display fields
-            if ("name".equals(key) || "id".equals(key) || "artist".equals(key)
-                    || "album".equals(key) || "desc".equals(key)
-                    || "imageUrl".equals(key) || "resourceUrl".equals(key)
-                    || "resourceExt".equals(key)) continue;
-            Object val = resInfo.opt(key);
-            if (val == null) continue;
-            String valStr = val.toString();
-            if (valStr.isEmpty() || "null".equals(valStr) || "0".equals(valStr)) continue;
-            // Skip JSON objects/arrays and very long values
-            if (valStr.startsWith("{") || valStr.startsWith("[") || valStr.length() > 200) continue;
-            card.addView(makeSmallLabel(key + ": " + valStr));
+        // Also check for extInfo at the resource level (some blocks put data here)
+        JSONObject extInfo = resource.optJSONObject("resourceExtInfo");
+        if (extInfo != null) {
+            // Some blocks store artists/songs/playlists here
+            JSONArray songData = extInfo.optJSONArray("songs");
+            if (songData != null) {
+                for (int s = 0; s < songData.length(); s++) {
+                    JSONObject song = songData.optJSONObject(s);
+                    if (song == null) continue;
+                    String sName = song.optString("name", "");
+                    if (!sName.isEmpty()) {
+                        card.addView(makeSmallLabel("• " + sName));
+                    }
+                }
+            }
+            // Playlist info
+            String playlistName = extInfo.optString("name", "");
+            if (!playlistName.isEmpty() && resInfo == null) {
+                card.addView(makeSmallLabel(playlistName));
+            }
+            int playCount = extInfo.optInt("playCount", 0);
+            if (playCount > 0) {
+                card.addView(makeSmallLabel("播放: " + formatCount(playCount)));
+            }
+            int trackCount = extInfo.optInt("trackCount", 0);
+            if (trackCount > 0) {
+                card.addView(makeSmallLabel("歌曲数: " + trackCount));
+            }
         }
 
-        contentLayout.addView(card);
+        // Only add card if it has children
+        if (card.getChildCount() > 0) {
+            contentLayout.addView(card);
+        }
+    }
+
+    private String formatCount(int count) {
+        if (count >= 100000000) {
+            return String.format(Locale.getDefault(), "%.1f亿", count / 100000000.0);
+        } else if (count >= 10000) {
+            return String.format(Locale.getDefault(), "%.1f万", count / 10000.0);
+        }
+        return String.valueOf(count);
     }
 
     private void displayUiElement(JSONObject uiElement) {
