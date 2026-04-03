@@ -1365,6 +1365,31 @@ public class MusicApiHelper {
     }
 
     /**
+     * Delete a comment on a song.
+     * Based on NeteaseCloudMusicApiBackup: /api/resource/comments/delete
+     */
+    public static void deleteComment(long songId, long commentId, String cookie, CommentActionCallback callback) {
+        executor.execute(() -> {
+            try {
+                String threadId = SONG_COMMENT_THREAD_PREFIX + songId;
+                JSONObject data = new JSONObject();
+                data.put("threadId", threadId);
+                data.put("commentId", commentId);
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+                MusicLog.op(TAG, "删除评论", "songId=" + songId + ", commentId=" + commentId);
+                String response = weapiPost("/api/resource/comments/delete", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                mainHandler.post(() -> callback.onResult(code == 200));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "删除评论失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /**
      * Get floor (sub) comments for a parent comment.
      */
     public static void getFloorComments(long songId, long parentCommentId, int limit, long time,

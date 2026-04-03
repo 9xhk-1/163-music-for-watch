@@ -122,7 +122,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         TextView title = new TextView(this);
         title.setText("楼层评论");
         title.setTextColor(COLOR_TEXT_PRIMARY);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
+        title.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
         title.setTypeface(title.getTypeface(), Typeface.BOLD);
         topBar.addView(title);
 
@@ -156,7 +156,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         TextView allRepliesLabel = new TextView(this);
         allRepliesLabel.setText("全部回复");
         allRepliesLabel.setTextColor(COLOR_TEXT_PRIMARY);
-        allRepliesLabel.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
+        allRepliesLabel.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
         allRepliesLabel.setTypeface(allRepliesLabel.getTypeface(), Typeface.BOLD);
         allRepliesLabel.setPadding(px(4), px(6), 0, px(4));
         dividerSection.addView(allRepliesLabel);
@@ -200,7 +200,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         inputField.setHint("回复楼主...");
         inputField.setHintTextColor(0xFF666666);
         inputField.setTextColor(COLOR_TEXT_PRIMARY);
-        inputField.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
+        inputField.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
         inputField.setSingleLine(true);
 
         GradientDrawable inputBg = new GradientDrawable();
@@ -217,7 +217,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         sendButton = new TextView(this);
         sendButton.setText("发送");
         sendButton.setTextColor(COLOR_ACCENT);
-        sendButton.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
+        sendButton.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
         sendButton.setTypeface(sendButton.getTypeface(), Typeface.BOLD);
         sendButton.setPadding(px(10), px(8), px(6), px(8));
         sendButton.setMinHeight(px(40));
@@ -377,7 +377,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         TextView nickTv = new TextView(this);
         nickTv.setText(nickname);
         nickTv.setTextColor(0xFF82B1FF);
-        nickTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(12));
+        nickTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
         nickTv.setSingleLine(true);
         nickTv.setEllipsize(TextUtils.TruncateAt.END);
         nameTimeCol.addView(nickTv);
@@ -389,7 +389,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         TextView timeTv = new TextView(this);
         timeTv.setText(timeAndIp);
         timeTv.setTextColor(COLOR_TEXT_SECONDARY);
-        timeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(10));
+        timeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(12));
         timeTv.setSingleLine(true);
         nameTimeCol.addView(timeTv);
 
@@ -400,7 +400,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         TextView contentTv = new TextView(this);
         contentTv.setText(content);
         contentTv.setTextColor(COLOR_TEXT_PRIMARY);
-        contentTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
+        contentTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
         contentTv.setPadding(px(27), px(4), 0, px(2));
         contentTv.setLineSpacing(px(2), 1f);
         item.addView(contentTv);
@@ -411,7 +411,7 @@ public class CommentFloorActivity extends AppCompatActivity {
 
         TextView likeTv = new TextView(this);
         updateLikeText(likeTv, isLiked[0], currentLikeCount[0]);
-        likeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        likeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
         likeTv.setPadding(px(27), px(4), 0, px(4));
         likeTv.setMinHeight(px(30));
         likeTv.setGravity(Gravity.CENTER_VERTICAL);
@@ -492,7 +492,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         TextView nickTv = new TextView(this);
         nickTv.setText(nickname);
         nickTv.setTextColor(0xFF82B1FF);
-        nickTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(12));
+        nickTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
         nickTv.setSingleLine(true);
         nickTv.setEllipsize(TextUtils.TruncateAt.END);
         nameTimeCol.addView(nickTv);
@@ -504,7 +504,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         TextView timeTv = new TextView(this);
         timeTv.setText(timeAndIp);
         timeTv.setTextColor(COLOR_TEXT_SECONDARY);
-        timeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(10));
+        timeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(12));
         timeTv.setSingleLine(true);
         nameTimeCol.addView(timeTv);
 
@@ -527,7 +527,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         TextView contentTv = new TextView(this);
         contentTv.setText(displayContent);
         contentTv.setTextColor(COLOR_TEXT_PRIMARY);
-        contentTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
+        contentTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
         contentTv.setPadding(px(27), px(4), 0, px(2));
         contentTv.setLineSpacing(px(2), 1f);
         item.addView(contentTv);
@@ -544,7 +544,7 @@ public class CommentFloorActivity extends AppCompatActivity {
 
         TextView likeTv = new TextView(this);
         updateLikeText(likeTv, isLiked[0], currentLikeCount[0]);
-        likeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        likeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
         likeTv.setPadding(0, px(4), px(12), px(4));
         likeTv.setMinHeight(px(30));
         likeTv.setGravity(Gravity.CENTER_VERTICAL);
@@ -582,7 +582,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         TextView replyTv = new TextView(this);
         replyTv.setText("回复");
         replyTv.setTextColor(COLOR_TEXT_SECONDARY);
-        replyTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        replyTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
         replyTv.setPadding(px(12), px(4), px(12), px(4));
         replyTv.setMinHeight(px(30));
         replyTv.setGravity(Gravity.CENTER_VERTICAL);
@@ -606,7 +606,7 @@ public class CommentFloorActivity extends AppCompatActivity {
     // ──────────────────────────────────────────────────────
 
     private View buildAvatarView(String nickname, long userId) {
-        int size = px(22);
+        int size = px(26);
         int colorIndex = (int) (Math.abs(userId) % AVATAR_COLORS.length);
         int bgColor = AVATAR_COLORS[colorIndex];
         String initial = "";
@@ -618,7 +618,7 @@ public class CommentFloorActivity extends AppCompatActivity {
         TextView avatar = new TextView(this);
         avatar.setText(initial);
         avatar.setTextColor(Color.WHITE);
-        avatar.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        avatar.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
         avatar.setTypeface(avatar.getTypeface(), Typeface.BOLD);
         avatar.setGravity(Gravity.CENTER);
         avatar.setContentDescription(nickname + "的头像");
@@ -671,7 +671,10 @@ public class CommentFloorActivity extends AppCompatActivity {
                                 hideKeyboard();
                                 Toast.makeText(CommentFloorActivity.this,
                                         "回复成功", Toast.LENGTH_SHORT).show();
-                                loadFloorComments(true);
+                                // Delay reload slightly so server has time to process
+                                new android.os.Handler().postDelayed(() -> {
+                                    loadFloorComments(true);
+                                }, 800);
                             } else {
                                 Toast.makeText(CommentFloorActivity.this,
                                         "回复失败，请重试", Toast.LENGTH_SHORT).show();

@@ -139,7 +139,7 @@ public class CommentActivity extends AppCompatActivity {
         TextView songTitle = new TextView(this);
         songTitle.setText(songName);
         songTitle.setTextColor(COLOR_TEXT_PRIMARY);
-        songTitle.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
+        songTitle.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
         songTitle.setTypeface(songTitle.getTypeface(), Typeface.BOLD);
         songTitle.setSingleLine(true);
         songTitle.setEllipsize(TextUtils.TruncateAt.MARQUEE);
@@ -153,7 +153,7 @@ public class CommentActivity extends AppCompatActivity {
 
         totalCountText = new TextView(this);
         totalCountText.setTextColor(COLOR_TEXT_SECONDARY);
-        totalCountText.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        totalCountText.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
         totalCountText.setPadding(px(6), 0, 0, 0);
         nameRow.addView(totalCountText);
 
@@ -184,7 +184,7 @@ public class CommentActivity extends AppCompatActivity {
     private TextView makeSortTab(String label, int sortType) {
         TextView tab = new TextView(this);
         tab.setText(label);
-        tab.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
+        tab.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
         tab.setPadding(px(10), px(4), px(10), px(4));
         tab.setGravity(Gravity.CENTER);
 
@@ -264,7 +264,7 @@ public class CommentActivity extends AppCompatActivity {
         inputField.setHint("写评论...");
         inputField.setHintTextColor(0xFF666666);
         inputField.setTextColor(COLOR_TEXT_PRIMARY);
-        inputField.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
+        inputField.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
         inputField.setSingleLine(true);
         inputField.setBackgroundColor(COLOR_INPUT_BG);
         inputField.setPadding(px(8), px(6), px(8), px(6));
@@ -282,7 +282,7 @@ public class CommentActivity extends AppCompatActivity {
         sendButton = new TextView(this);
         sendButton.setText("发送");
         sendButton.setTextColor(COLOR_ACCENT);
-        sendButton.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
+        sendButton.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
         sendButton.setTypeface(sendButton.getTypeface(), Typeface.BOLD);
         sendButton.setPadding(px(10), px(8), px(6), px(8));
         sendButton.setMinHeight(px(40));
@@ -439,7 +439,7 @@ public class CommentActivity extends AppCompatActivity {
         TextView nickTv = new TextView(this);
         nickTv.setText(nickname);
         nickTv.setTextColor(0xFF82B1FF);
-        nickTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(12));
+        nickTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
         nickTv.setSingleLine(true);
         nickTv.setEllipsize(TextUtils.TruncateAt.END);
         nameTimeCol.addView(nickTv);
@@ -451,7 +451,7 @@ public class CommentActivity extends AppCompatActivity {
         TextView timeTv = new TextView(this);
         timeTv.setText(timeAndIp);
         timeTv.setTextColor(COLOR_TEXT_SECONDARY);
-        timeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(10));
+        timeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(12));
         timeTv.setSingleLine(true);
         nameTimeCol.addView(timeTv);
 
@@ -462,7 +462,7 @@ public class CommentActivity extends AppCompatActivity {
         TextView contentTv = new TextView(this);
         contentTv.setText(content);
         contentTv.setTextColor(COLOR_TEXT_PRIMARY);
-        contentTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
+        contentTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
         contentTv.setPadding(px(27), px(4), 0, px(2));
         contentTv.setLineSpacing(px(2), 1f);
         item.addView(contentTv);
@@ -481,7 +481,7 @@ public class CommentActivity extends AppCompatActivity {
                     TextView repliedTv = new TextView(this);
                     repliedTv.setText("@" + repliedNick + ": " + repliedContent);
                     repliedTv.setTextColor(COLOR_TEXT_SECONDARY);
-                    repliedTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+                    repliedTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
                     repliedTv.setPadding(px(27), px(2), px(4), px(2));
                     repliedTv.setMaxLines(2);
                     repliedTv.setEllipsize(TextUtils.TruncateAt.END);
@@ -514,7 +514,7 @@ public class CommentActivity extends AppCompatActivity {
 
         TextView likeTv = new TextView(this);
         updateLikeText(likeTv, isLiked[0], currentLikeCount[0]);
-        likeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        likeTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
         likeTv.setPadding(0, px(4), px(12), px(4));
         likeTv.setMinHeight(px(30));
         likeTv.setGravity(Gravity.CENTER_VERTICAL);
@@ -551,7 +551,7 @@ public class CommentActivity extends AppCompatActivity {
         TextView replyTv = new TextView(this);
         replyTv.setText("回复");
         replyTv.setTextColor(COLOR_TEXT_SECONDARY);
-        replyTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        replyTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
         replyTv.setPadding(px(12), px(4), px(12), px(4));
         replyTv.setMinHeight(px(30));
         replyTv.setGravity(Gravity.CENTER_VERTICAL);
@@ -566,7 +566,7 @@ public class CommentActivity extends AppCompatActivity {
                 TextView floorTv = new TextView(this);
                 floorTv.setText("查看" + replyCount + "条回复 >");
                 floorTv.setTextColor(0xFF82B1FF);
-                floorTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+                floorTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
                 floorTv.setPadding(px(12), px(4), 0, px(4));
                 floorTv.setMinHeight(px(30));
                 floorTv.setGravity(Gravity.CENTER_VERTICAL);
@@ -576,6 +576,33 @@ public class CommentActivity extends AppCompatActivity {
         }
 
         item.addView(footer);
+
+        // Long-press to delete comment (with confirmation)
+        final String displayNick = nickname;
+        final String displayContent = content;
+        item.setOnLongClickListener(v -> {
+            showConfirmDialog("删除评论", "确定删除「" + displayNick + "」的评论？\n\n" + (displayContent.length() > 40 ? displayContent.substring(0, 40) + "..." : displayContent), () -> {
+                MusicApiHelper.deleteComment(songId, commentId, cookie, new MusicApiHelper.CommentActionCallback() {
+                    @Override
+                    public void onResult(boolean success) {
+                        runOnUiThread(() -> {
+                            if (success) {
+                                Toast.makeText(CommentActivity.this, "评论已删除", Toast.LENGTH_SHORT).show();
+                                loadComments(true);
+                            } else {
+                                Toast.makeText(CommentActivity.this, "删除失败（可能不是自己的评论）", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        runOnUiThread(() -> Toast.makeText(CommentActivity.this, "删除失败: " + message, Toast.LENGTH_SHORT).show());
+                    }
+                });
+            });
+            return true;
+        });
 
         return item;
     }
@@ -592,7 +619,7 @@ public class CommentActivity extends AppCompatActivity {
     // ──────────────────────────────────────────────────────
 
     private View buildAvatarView(String nickname, long userId) {
-        int size = px(22);
+        int size = px(26);
         int colorIndex = (int) (Math.abs(userId) % AVATAR_COLORS.length);
         int bgColor = AVATAR_COLORS[colorIndex];
         String initial = "";
@@ -604,7 +631,7 @@ public class CommentActivity extends AppCompatActivity {
         TextView avatar = new TextView(this);
         avatar.setText(initial);
         avatar.setTextColor(Color.WHITE);
-        avatar.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        avatar.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
         avatar.setTypeface(avatar.getTypeface(), Typeface.BOLD);
         avatar.setGravity(Gravity.CENTER);
         avatar.setContentDescription(nickname + "的头像");
@@ -652,10 +679,12 @@ public class CommentActivity extends AppCompatActivity {
                         hideKeyboard();
                         Toast.makeText(CommentActivity.this,
                                 "评论成功", Toast.LENGTH_SHORT).show();
-                        // Reload to show new comment (switch to newest sort)
-                        currentSortType = 3;
-                        updateSortTabs();
-                        loadComments(true);
+                        // Delay reload slightly so server has time to process
+                        new android.os.Handler().postDelayed(() -> {
+                            currentSortType = 3;
+                            updateSortTabs();
+                            loadComments(true);
+                        }, 800);
                     } else {
                         Toast.makeText(CommentActivity.this,
                                 "评论失败，请重试", Toast.LENGTH_SHORT).show();
@@ -794,6 +823,97 @@ public class CommentActivity extends AppCompatActivity {
         params.setMargins(px(27), 0, 0, 0);
         divider.setLayoutParams(params);
         return divider;
+    }
+
+    /**
+     * Show a confirmation dialog adapted for watch (same style as DownloadListActivity).
+     */
+    private void showConfirmDialog(String title, String message, Runnable onConfirm) {
+        android.widget.FrameLayout rootView = findViewById(android.R.id.content);
+
+        android.widget.FrameLayout overlay = new android.widget.FrameLayout(this);
+        overlay.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+        overlay.setBackgroundColor(0xCC333333);
+
+        LinearLayout dialog = new LinearLayout(this);
+        dialog.setOrientation(LinearLayout.VERTICAL);
+        dialog.setBackgroundColor(0xFF424242);
+        dialog.setPadding(px(16), px(12), px(16), px(12));
+        android.widget.FrameLayout.LayoutParams dlgParams = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+        dlgParams.gravity = Gravity.CENTER;
+        dlgParams.leftMargin = px(16);
+        dlgParams.rightMargin = px(16);
+        dialog.setLayoutParams(dlgParams);
+
+        // Title
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(0xFFFFFFFF);
+        tvTitle.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(18));
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, px(6));
+        dialog.addView(tvTitle);
+
+        // Message
+        TextView tvMessage = new TextView(this);
+        tvMessage.setText(message);
+        tvMessage.setTextColor(0xFFCCCCCC);
+        tvMessage.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
+        tvMessage.setGravity(Gravity.CENTER);
+        tvMessage.setPadding(0, 0, 0, px(12));
+        dialog.addView(tvMessage);
+
+        // Buttons row
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setGravity(Gravity.CENTER);
+        dialog.addView(btnRow);
+
+        // Cancel button
+        TextView btnCancel = new TextView(this);
+        btnCancel.setText("取消");
+        btnCancel.setTextColor(0xFFFFFFFF);
+        btnCancel.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnCancel.setGravity(Gravity.CENTER);
+        btnCancel.setPadding(px(12), px(8), px(12), px(8));
+        btnCancel.setBackgroundColor(0xFF616161);
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        cancelParams.rightMargin = px(4);
+        btnCancel.setLayoutParams(cancelParams);
+        btnCancel.setClickable(true);
+        btnCancel.setFocusable(true);
+        btnCancel.setOnClickListener(v -> rootView.removeView(overlay));
+        btnRow.addView(btnCancel);
+
+        // Confirm button
+        TextView btnConfirm = new TextView(this);
+        btnConfirm.setText("确定");
+        btnConfirm.setTextColor(0xFFFFFFFF);
+        btnConfirm.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnConfirm.setGravity(Gravity.CENTER);
+        btnConfirm.setPadding(px(12), px(8), px(12), px(8));
+        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        confirmParams.leftMargin = px(4);
+        btnConfirm.setLayoutParams(confirmParams);
+        btnConfirm.setClickable(true);
+        btnConfirm.setFocusable(true);
+        btnConfirm.setOnClickListener(v -> {
+            rootView.removeView(overlay);
+            onConfirm.run();
+        });
+        btnRow.addView(btnConfirm);
+
+        overlay.addView(dialog);
+        overlay.setOnClickListener(v -> rootView.removeView(overlay));
+        dialog.setOnClickListener(v -> { /* consume click */ });
+        rootView.addView(overlay);
     }
 
     /**
