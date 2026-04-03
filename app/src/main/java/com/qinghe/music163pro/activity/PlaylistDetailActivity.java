@@ -188,12 +188,60 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         lvSongs.setOnItemClickListener((parent, view, position, id) -> {
             List<Song> playlist = new ArrayList<>(displayList);
             playerManager.setPlaylistFromSource(playlist, position,
-                    playlistId, playlistName, trackCount, creator);
+                    playlistId, playlistName, trackCount, creator,
+                    creatorUserId, isLikedPlaylist);
             playerManager.playCurrent();
             Intent intent = new Intent(this, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             startActivity(intent);
             finish();
+        });
+
+        // Long-press to delete song from user's created playlist (not liked playlist)
+        lvSongs.setOnItemLongClickListener((parent, view, position, id) -> {
+            if (!isCloudMode || isLikedPlaylist) return false;
+            if (creatorUserId <= 0 || creatorUserId != currentUserId) return false;
+
+            Song song = displayList.get(position);
+            new AlertDialog.Builder(this)
+                    .setTitle("删除歌曲")
+                    .setMessage("确定要从歌单中删除「" + song.getName() + "」吗？")
+                    .setPositiveButton("删除", (d, w) -> {
+                        String cookie = playerManager.getCookie();
+                        if (cookie == null || cookie.isEmpty()) {
+                            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        Toast.makeText(this, "正在删除...", Toast.LENGTH_SHORT).show();
+                        MusicApiHelper.playlistTracks("del", playlistId,
+                                new long[]{song.getId()}, cookie,
+                                new MusicApiHelper.PlaylistActionCallback() {
+                                    @Override
+                                    public void onResult(boolean success) {
+                                        if (success) {
+                                            displayList.remove(position);
+                                            adapter.notifyDataSetChanged();
+                                            trackCount = displayList.size();
+                                            updateTitleText();
+                                            tvStatus.setText(trackCount + " 首歌曲");
+                                            Toast.makeText(PlaylistDetailActivity.this,
+                                                    "已删除", Toast.LENGTH_SHORT).show();
+                                        } else {
+                                            Toast.makeText(PlaylistDetailActivity.this,
+                                                    "删除失败", Toast.LENGTH_SHORT).show();
+                                        }
+                                    }
+
+                                    @Override
+                                    public void onError(String message) {
+                                        Toast.makeText(PlaylistDetailActivity.this,
+                                                "删除失败: " + message, Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                    })
+                    .setNegativeButton("取消", null)
+                    .show();
+            return true;
         });
 
         // Get current user ID for cloud mode rules
@@ -343,7 +391,8 @@ public class PlaylistDetailActivity extends AppCompatActivity {
             } else {
                 PlaylistInfo info = new PlaylistInfo(playlistId,
                         playlistName != null ? playlistName : "",
-                        trackCount, creator != null ? creator : "");
+                        trackCount, creator != null ? creator : "",
+                        creatorUserId, true, isLikedPlaylist ? "5" : "0");
                 playlistManager.addPlaylist(info);
                 Toast.makeText(this, "已收藏歌单", Toast.LENGTH_SHORT).show();
             }

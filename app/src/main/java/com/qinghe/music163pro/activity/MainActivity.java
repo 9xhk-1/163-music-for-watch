@@ -238,6 +238,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 plIntent.putExtra("playlist_name", playerManager.getSourcePlaylistName());
                 plIntent.putExtra("track_count", playerManager.getSourcePlaylistTrackCount());
                 plIntent.putExtra("creator", playerManager.getSourcePlaylistCreator());
+                plIntent.putExtra("creator_user_id", playerManager.getSourcePlaylistCreatorUserId());
+                plIntent.putExtra("is_liked_playlist", playerManager.getSourcePlaylistIsLiked());
                 startActivity(plIntent);
             }
         });

@@ -126,6 +126,8 @@ public class FavoritesListActivity extends AppCompatActivity {
             intent.putExtra("playlist_name", pl.getName());
             intent.putExtra("track_count", pl.getTrackCount());
             intent.putExtra("creator", pl.getCreator());
+            intent.putExtra("creator_user_id", pl.getUserId());
+            intent.putExtra("is_liked_playlist", pl.isLikedPlaylist());
             startActivity(intent);
         });
 

@@ -32,6 +32,8 @@ public class MusicPlayerManager {
     private static final String KEY_SOURCE_PLAYLIST_NAME = "source_playlist_name";
     private static final String KEY_SOURCE_PLAYLIST_TRACK_COUNT = "source_playlist_track_count";
     private static final String KEY_SOURCE_PLAYLIST_CREATOR = "source_playlist_creator";
+    private static final String KEY_SOURCE_PLAYLIST_CREATOR_USER_ID = "source_playlist_creator_user_id";
+    private static final String KEY_SOURCE_PLAYLIST_IS_LIKED = "source_playlist_is_liked";
 
     public enum PlayMode {
         LIST_LOOP,      // 列表循环
@@ -66,6 +68,8 @@ public class MusicPlayerManager {
     private String sourcePlaylistName;
     private int sourcePlaylistTrackCount;
     private String sourcePlaylistCreator;
+    private long sourcePlaylistCreatorUserId;
+    private boolean sourcePlaylistIsLiked;
 
     private MusicPlayerManager() {}
 
@@ -93,6 +97,8 @@ public class MusicPlayerManager {
         sourcePlaylistName = null;
         sourcePlaylistTrackCount = 0;
         sourcePlaylistCreator = null;
+        sourcePlaylistCreatorUserId = 0;
+        sourcePlaylistIsLiked = false;
         savePlaybackState();
     }
 
@@ -101,7 +107,8 @@ public class MusicPlayerManager {
      */
     public void setPlaylistFromSource(List<Song> songs, int startIndex,
                                        long playlistId, String playlistName,
-                                       int trackCount, String creator) {
+                                       int trackCount, String creator,
+                                       long creatorUserId, boolean isLiked) {
         playlist.clear();
         playlist.addAll(songs);
         currentIndex = startIndex;
@@ -109,6 +116,8 @@ public class MusicPlayerManager {
         sourcePlaylistName = playlistName;
         sourcePlaylistTrackCount = trackCount;
         sourcePlaylistCreator = creator;
+        sourcePlaylistCreatorUserId = creatorUserId;
+        sourcePlaylistIsLiked = isLiked;
         savePlaybackState();
     }
 
@@ -116,6 +125,8 @@ public class MusicPlayerManager {
     public String getSourcePlaylistName() { return sourcePlaylistName; }
     public int getSourcePlaylistTrackCount() { return sourcePlaylistTrackCount; }
     public String getSourcePlaylistCreator() { return sourcePlaylistCreator; }
+    public long getSourcePlaylistCreatorUserId() { return sourcePlaylistCreatorUserId; }
+    public boolean getSourcePlaylistIsLiked() { return sourcePlaylistIsLiked; }
 
     public boolean hasSourcePlaylist() { return sourcePlaylistId > 0; }
 
@@ -548,6 +559,8 @@ public class MusicPlayerManager {
             editor.putString(KEY_SOURCE_PLAYLIST_NAME, sourcePlaylistName);
             editor.putInt(KEY_SOURCE_PLAYLIST_TRACK_COUNT, sourcePlaylistTrackCount);
             editor.putString(KEY_SOURCE_PLAYLIST_CREATOR, sourcePlaylistCreator);
+            editor.putLong(KEY_SOURCE_PLAYLIST_CREATOR_USER_ID, sourcePlaylistCreatorUserId);
+            editor.putBoolean(KEY_SOURCE_PLAYLIST_IS_LIKED, sourcePlaylistIsLiked);
 
             editor.apply();
         } catch (Exception e) {
@@ -597,6 +610,8 @@ public class MusicPlayerManager {
             sourcePlaylistName = prefs.getString(KEY_SOURCE_PLAYLIST_NAME, null);
             sourcePlaylistTrackCount = prefs.getInt(KEY_SOURCE_PLAYLIST_TRACK_COUNT, 0);
             sourcePlaylistCreator = prefs.getString(KEY_SOURCE_PLAYLIST_CREATOR, null);
+            sourcePlaylistCreatorUserId = prefs.getLong(KEY_SOURCE_PLAYLIST_CREATOR_USER_ID, 0);
+            sourcePlaylistIsLiked = prefs.getBoolean(KEY_SOURCE_PLAYLIST_IS_LIKED, false);
 
             return true;
         } catch (Exception e) {
