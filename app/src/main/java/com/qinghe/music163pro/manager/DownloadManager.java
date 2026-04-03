@@ -139,6 +139,7 @@ public class DownloadManager {
 
     /**
      * Download lyrics for a song and save as lyrics.lrc in the song's download folder.
+     * Also downloads translated lyrics as tlyrics.lrc if available.
      */
     private static void downloadLyrics(File songDir, Song song) {
         if (song.getId() <= 0) return;
@@ -154,6 +155,20 @@ public class DownloadManager {
             }
         } catch (Exception e) {
             Log.w(TAG, "Error downloading lyrics", e);
+        }
+        // Also download translated lyrics
+        try {
+            String tlyricText = MusicApiHelper.fetchTranslatedLyricsSync(song.getId(), null);
+            if (tlyricText != null && !tlyricText.isEmpty()) {
+                File tlyricFile = new File(songDir, "tlyrics.lrc");
+                try (FileOutputStream fos = new FileOutputStream(tlyricFile);
+                     OutputStreamWriter writer = new OutputStreamWriter(fos, "UTF-8")) {
+                    writer.write(tlyricText);
+                    writer.flush();
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error downloading translated lyrics", e);
         }
     }
 

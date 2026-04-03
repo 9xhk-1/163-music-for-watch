@@ -47,7 +47,7 @@ public class AboutActivity extends AppCompatActivity {
 
         // Version
         content.addView(makeSpacer(px(4)));
-        String versionName = "20260402";
+        String versionName = "20260403";
         try {
             versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) {}
@@ -76,7 +76,44 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeSpacer(px(8)));
         content.addView(makeDivider());
 
-        // v20260402 update summary (latest)
+        // v20260403 update summary (latest)
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("v20260403 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText(
+                "• 评论界面字体全面加大，适配手表屏幕阅读\n"
+                + "• 新增长按删除评论功能（带确认弹窗）\n"
+                + "• 修复发送评论后不自动刷新的问题\n"
+                + "• 音乐信息页面全面重写：显示歌曲详情（时长、专辑、音质、发布时间等所有字段）\n"
+                + "• 音乐信息页面展示歌曲百科所有板块内容\n"
+                + "• 新增歌手百科请求日志记录\n"
+                + "• 修复歌词界面熄屏/回桌面后歌词不再滚动的问题",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
+        // v20260402-fix1 update summary
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("v20260402-fix1 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText(
+                "• 新增音乐信息功能：查看歌曲百科和歌手简介\n"
+                + "• 新增评论功能：查看评论、发送评论、点赞、回复、查看楼层子评论\n"
+                + "• 评论支持排序切换（推荐/最热/最新）\n"
+                + "• 修复歌词界面点击右上角有概率进入更多选项的问题\n"
+                + "• 修复歌词界面点击右下角有概率触发音量调节的问题\n"
+                + "• 歌词界面新增翻译开关，支持中英双语歌词显示\n"
+                + "• 翻译偏好持久化，开启/关闭后自动应用到后续歌曲\n"
+                + "• 下载歌曲时同步下载翻译歌词",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
+        // v20260402 update summary
         content.addView(makeSpacer(px(8)));
         content.addView(makeText("v20260402 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
         content.addView(makeSpacer(px(4)));

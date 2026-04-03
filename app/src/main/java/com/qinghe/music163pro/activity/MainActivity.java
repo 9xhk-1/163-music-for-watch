@@ -90,10 +90,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private Runnable lyricsScrollRunnable;
     private TextView tvLyricsSongLabel;
     private TextView tvLyricsTimeRef;
+    // Translation lyrics
+    private String currentTlyricText; // Raw translated LRC text for current song
+    private boolean translationEnabled; // Whether translation is currently showing
+    private TextView btnTranslationToggle; // Toggle button in lyrics overlay
+    private final java.util.Map<Long, String> translationMap = new java.util.HashMap<>(); // timeMs -> translated text
 
     private static class LyricLine {
         long timeMs;
         String text;
+        String translation; // Optional translated text
         LyricLine(long timeMs, String text) {
             this.timeMs = timeMs;
             this.text = text;
@@ -321,6 +327,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         if (playerManager.isPlaying()) {
             startSeekBarUpdate();
         }
+        // Restart lyrics scroll sync if lyrics overlay is visible
+        if (lyricsOverlayShowing && !lyricLines.isEmpty() && tvLyricsTimeRef != null) {
+            startLyricsScrollSync(tvLyricsTimeRef);
+        }
     }
 
     // ==================== Functions Overlay ====================
@@ -456,7 +466,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 v -> onFuncPlaybackSpeed()));
         contentLayout.addView(row3);
 
-        // Row 4: 播放列表
+        // Row 4: 音乐信息 + 评论
         LinearLayout row4 = new LinearLayout(this);
         row4.setOrientation(LinearLayout.HORIZONTAL);
         row4.setGravity(Gravity.CENTER);
@@ -464,13 +474,27 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row4.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        row4.addView(createFuncItem("📋", "播放列表",
+        row4.addView(createFuncItem("ℹ", "音乐信息",
+                v -> onFuncSongInfo(song)));
+        row4.addView(createFuncItem("💬", "评论",
+                v -> onFuncComments(song)));
+        contentLayout.addView(row4);
+
+        // Row 5: 播放列表
+        LinearLayout row5 = new LinearLayout(this);
+        row5.setOrientation(LinearLayout.HORIZONTAL);
+        row5.setGravity(Gravity.CENTER);
+        row5.setPadding(0, dp(4), 0, 0);
+        row5.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        row5.addView(createFuncItem("📋", "播放列表",
                 v -> onFuncShowPlaylist()));
         // Empty placeholder for alignment
         LinearLayout placeholder = new LinearLayout(this);
         placeholder.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        row4.addView(placeholder);
-        contentLayout.addView(row4);
+        row5.addView(placeholder);
+        contentLayout.addView(row5);
 
         scrollView.addView(contentLayout);
         overlayContainer.addView(scrollView);
@@ -760,6 +784,26 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         showLyricsOverlay();
     }
 
+    private void onFuncSongInfo(Song song) {
+        dismissOverlay();
+        Intent intent = new Intent(this, SongInfoActivity.class);
+        intent.putExtra("song_id", song.getId());
+        intent.putExtra("song_name", song.getName());
+        intent.putExtra("artist_name", song.getArtist());
+        intent.putExtra("artist_id", 0L); // Will be extracted from wiki API
+        intent.putExtra("cookie", playerManager.getCookie());
+        startActivity(intent);
+    }
+
+    private void onFuncComments(Song song) {
+        dismissOverlay();
+        Intent intent = new Intent(this, CommentActivity.class);
+        intent.putExtra("song_id", song.getId());
+        intent.putExtra("song_name", song.getName());
+        intent.putExtra("cookie", playerManager.getCookie());
+        startActivity(intent);
+    }
+
     // ==================== Lyrics Overlay ====================
 
     /**
@@ -779,24 +823,56 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         overlayContainer.setBackgroundColor(0xFF212121);
-        // Don't use addSwipeToDismiss - dispatchTouchEvent handles it
+        // Consume all touch events to prevent underlying buttons from receiving clicks
+        overlayContainer.setOnTouchListener((v, event) -> true);
+        // Don't use addSwipeToDismiss - dispatchTouchEvent handles swipe gestures
 
         LinearLayout mainLayout = new LinearLayout(this);
         mainLayout.setOrientation(LinearLayout.VERTICAL);
         mainLayout.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // Song name at top
+        // Top bar: Song name + translation toggle button
+        FrameLayout topBar = new FrameLayout(this);
+        topBar.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        // Song name at top (leave right padding for the toggle button)
         tvLyricsSongLabel = new TextView(this);
         tvLyricsSongLabel.setText(song.getName() + " - " + song.getArtist());
         tvLyricsSongLabel.setTextColor(0xFFFFFFFF);
         tvLyricsSongLabel.setTextSize(13);
         tvLyricsSongLabel.setGravity(Gravity.CENTER);
-        tvLyricsSongLabel.setPadding(dp(6), dp(6), dp(6), dp(4));
+        tvLyricsSongLabel.setPadding(dp(30), dp(6), dp(30), dp(4));
         tvLyricsSongLabel.setSingleLine(true);
         tvLyricsSongLabel.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
         tvLyricsSongLabel.setSelected(true);
-        mainLayout.addView(tvLyricsSongLabel);
+        FrameLayout.LayoutParams songLabelParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        tvLyricsSongLabel.setLayoutParams(songLabelParams);
+        topBar.addView(tvLyricsSongLabel);
+
+        // Translation toggle button (top-right), hidden by default until we know translation exists
+        SharedPreferences transPrefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        translationEnabled = transPrefs.getBoolean("lyrics_translation", false);
+        btnTranslationToggle = new TextView(this);
+        btnTranslationToggle.setText(translationEnabled ? "译✓" : "译");
+        btnTranslationToggle.setTextColor(translationEnabled ? 0xFFFF5252 : 0xFF888888);
+        btnTranslationToggle.setTextSize(12);
+        btnTranslationToggle.setGravity(Gravity.CENTER);
+        btnTranslationToggle.setPadding(dp(6), dp(4), dp(6), dp(4));
+        btnTranslationToggle.setClickable(true);
+        btnTranslationToggle.setFocusable(true);
+        btnTranslationToggle.setVisibility(View.GONE); // Hidden until translation is available
+        FrameLayout.LayoutParams toggleParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        toggleParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+        toggleParams.setMarginEnd(dp(2));
+        btnTranslationToggle.setLayoutParams(toggleParams);
+        btnTranslationToggle.setOnClickListener(v -> toggleLyricsTranslation());
+        topBar.addView(btnTranslationToggle);
+
+        mainLayout.addView(topBar);
 
         // Lyrics scroll view
         lyricsScrollView = new ScrollView(this);
@@ -834,13 +910,23 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Try local .lrc file first
         String localLrc = loadLocalLrc(song);
         if (localLrc != null && !localLrc.isEmpty()) {
+            // Also try to load local translated lyrics
+            String localTlyric = loadLocalTlyric(song);
+            currentTlyricText = localTlyric;
             parseLrc(localLrc);
+            if (localTlyric != null && !localTlyric.isEmpty()) {
+                parseTranslationLrc(localTlyric);
+                applyTranslationsToLyrics();
+                if (btnTranslationToggle != null) {
+                    btnTranslationToggle.setVisibility(View.VISIBLE);
+                }
+            }
             displayLyricsInOverlay();
             startLyricsScrollSync(tvLyricsTime);
             return;
         }
 
-        // Fetch from API
+        // Fetch from API (with translation)
         if (song.getId() <= 0) {
             showNoLyricsInOverlay();
             return;
@@ -856,14 +942,26 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         lyricsContainer.addView(tvLoading);
 
         String cookie = playerManager.getCookie();
-        MusicApiHelper.getLyrics(song.getId(), cookie, new MusicApiHelper.LyricsCallback() {
+        MusicApiHelper.getLyricsWithTranslation(song.getId(), cookie, new MusicApiHelper.LyricsFullCallback() {
             @Override
-            public void onResult(String lrcText) {
+            public void onResult(String lrcText, String tlyricText) {
                 if (lrcText == null || lrcText.isEmpty()) {
                     showNoLyricsInOverlay();
                     return;
                 }
+                currentTlyricText = tlyricText;
                 parseLrc(lrcText);
+                if (tlyricText != null && !tlyricText.isEmpty()) {
+                    parseTranslationLrc(tlyricText);
+                    applyTranslationsToLyrics();
+                    if (btnTranslationToggle != null) {
+                        btnTranslationToggle.setVisibility(View.VISIBLE);
+                    }
+                } else {
+                    if (btnTranslationToggle != null) {
+                        btnTranslationToggle.setVisibility(View.GONE);
+                    }
+                }
                 displayLyricsInOverlay();
                 startLyricsScrollSync(tvLyricsTime);
             }
@@ -901,11 +999,41 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
     }
 
+    /**
+     * Load translated lyrics from local download folder (tlyrics.lrc).
+     */
+    private String loadLocalTlyric(Song song) {
+        try {
+            String safeName = song.getName().replaceAll("[\\\\/:*?\"<>|]", "_");
+            String safeArtist = song.getArtist().replaceAll("[\\\\/:*?\"<>|]", "_");
+            String folderName = safeName + " - " + safeArtist;
+            java.io.File tlyricFile = new java.io.File(
+                    android.os.Environment.getExternalStorageDirectory(),
+                    "163Music/Download/" + folderName + "/tlyrics.lrc"
+            );
+            if (!tlyricFile.exists()) return null;
+
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(tlyricFile);
+                 java.io.InputStreamReader reader = new java.io.InputStreamReader(fis, "UTF-8")) {
+                StringBuilder sb = new StringBuilder();
+                char[] buf = new char[1024];
+                int len;
+                while ((len = reader.read(buf)) != -1) {
+                    sb.append(buf, 0, len);
+                }
+                return sb.toString();
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private static final java.util.regex.Pattern LRC_PATTERN =
             java.util.regex.Pattern.compile("\\[(\\d{1,3}):(\\d{2})\\.?(\\d{0,3})\\](.*)");
 
     private void parseLrc(String lrcText) {
         lyricLines.clear();
+        translationMap.clear();
         String[] lines = lrcText.split("\n");
         for (String line : lines) {
             java.util.regex.Matcher matcher = LRC_PATTERN.matcher(line.trim());
@@ -929,6 +1057,69 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
     }
 
+    /**
+     * Parse translated lyrics LRC into the translationMap (timeMs -> translated text).
+     */
+    private void parseTranslationLrc(String tlyricText) {
+        translationMap.clear();
+        if (tlyricText == null || tlyricText.isEmpty()) return;
+        String[] lines = tlyricText.split("\n");
+        for (String line : lines) {
+            java.util.regex.Matcher matcher = LRC_PATTERN.matcher(line.trim());
+            if (matcher.matches()) {
+                int min = Integer.parseInt(matcher.group(1));
+                int sec = Integer.parseInt(matcher.group(2));
+                String msStr = matcher.group(3);
+                int ms = 0;
+                if (msStr != null && !msStr.isEmpty()) {
+                    int parsed = Integer.parseInt(msStr.substring(0, Math.min(msStr.length(), 3)));
+                    if (msStr.length() == 1) ms = parsed * 100;
+                    else if (msStr.length() == 2) ms = parsed * 10;
+                    else ms = parsed;
+                }
+                long timeMs = (long) min * 60 * 1000 + (long) sec * 1000 + ms;
+                String text = matcher.group(4).trim();
+                if (!text.isEmpty()) {
+                    translationMap.put(timeMs, text);
+                }
+            }
+        }
+    }
+
+    /**
+     * Apply translations from translationMap to each lyricLine's translation field.
+     */
+    private void applyTranslationsToLyrics() {
+        for (LyricLine line : lyricLines) {
+            String trans = translationMap.get(line.timeMs);
+            line.translation = trans; // may be null if no translation for this line
+        }
+    }
+
+    /**
+     * Toggle lyrics translation display on/off.
+     * Saves preference persistently.
+     */
+    private void toggleLyricsTranslation() {
+        translationEnabled = !translationEnabled;
+        // Save preference
+        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        prefs.edit().putBoolean("lyrics_translation", translationEnabled).apply();
+        // Update button appearance
+        if (btnTranslationToggle != null) {
+            btnTranslationToggle.setText(translationEnabled ? "译✓" : "译");
+            btnTranslationToggle.setTextColor(translationEnabled ? 0xFFFF5252 : 0xFF888888);
+        }
+        // Re-display lyrics with or without translation
+        displayLyricsInOverlay();
+        // Restart sync to update highlighting
+        if (tvLyricsTimeRef != null) {
+            lyricsScrollHandler.removeCallbacksAndMessages(null);
+            currentHighlightIndex = -1;
+            startLyricsScrollSync(tvLyricsTimeRef);
+        }
+    }
+
     private void displayLyricsInOverlay() {
         if (lyricsContainer == null) return;
         lyricsContainer.removeAllViews();
@@ -941,14 +1132,33 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
 
         for (LyricLine line : lyricLines) {
+            // Container for each lyric line (original + optional translation)
+            LinearLayout lineLayout = new LinearLayout(this);
+            lineLayout.setOrientation(LinearLayout.VERTICAL);
+            lineLayout.setGravity(Gravity.CENTER_HORIZONTAL);
+            lineLayout.setPadding(0, dp(5), 0, dp(5));
+
+            // Original lyrics text
             TextView tv = new TextView(this);
             tv.setText(line.text);
             tv.setTextColor(0xFF888888);
             tv.setTextSize(13);
             tv.setGravity(Gravity.CENTER);
-            tv.setPadding(0, dp(6), 0, dp(6));
-            lyricsContainer.addView(tv);
+            lineLayout.addView(tv);
             lyricViews.add(tv);
+
+            // Translation text (if available and enabled)
+            if (translationEnabled && line.translation != null && !line.translation.isEmpty()) {
+                TextView tvTrans = new TextView(this);
+                tvTrans.setText(line.translation);
+                tvTrans.setTextColor(0xFF666666);
+                tvTrans.setTextSize(11);
+                tvTrans.setGravity(Gravity.CENTER);
+                tvTrans.setPadding(0, dp(1), 0, 0);
+                lineLayout.addView(tvTrans);
+            }
+
+            lyricsContainer.addView(lineLayout);
         }
     }
 
@@ -999,11 +1209,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                             currentView.setTextSize(14);
 
                             // Scroll to center the current line
+                            // The lyric TextView is inside a lineLayout container,
+                            // so use the parent container's position for scrolling
                             currentView.post(() -> {
                                 if (lyricsScrollView == null) return;
                                 int scrollViewHeight = lyricsScrollView.getHeight();
-                                int targetTop = currentView.getTop();
-                                int targetHeight = currentView.getHeight();
+                                View parentLayout = (View) currentView.getParent();
+                                int targetTop = parentLayout != null ? parentLayout.getTop() : currentView.getTop();
+                                int targetHeight = parentLayout != null ? parentLayout.getHeight() : currentView.getHeight();
                                 int scrollTo = targetTop - (scrollViewHeight / 2) + (targetHeight / 2);
                                 lyricsScrollView.smoothScrollTo(0, Math.max(0, scrollTo));
                             });
@@ -1022,6 +1235,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         lyricsOverlayShowing = false;
         lyricLines.clear();
         lyricViews.clear();
+        translationMap.clear();
+        currentTlyricText = null;
+        btnTranslationToggle = null;
         currentHighlightIndex = -1;
         lyricsScrollView = null;
         lyricsContainer = null;
@@ -1968,10 +2184,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             lyricsScrollRunnable = null;
             lyricLines.clear();
             lyricViews.clear();
+            translationMap.clear();
+            currentTlyricText = null;
             currentHighlightIndex = -1;
             // Update song name label
             if (tvLyricsSongLabel != null) {
                 tvLyricsSongLabel.setText(song.getName() + " - " + song.getArtist());
+            }
+            // Hide translation button until we know if new song has translation
+            if (btnTranslationToggle != null) {
+                btnTranslationToggle.setVisibility(View.GONE);
             }
             // Reload lyrics for new song
             loadLyricsForOverlay(song, tvLyricsTimeRef);
