@@ -17,11 +17,11 @@ import java.nio.charset.Charset;
 
 /**
  * Utility for checking app updates and downloading the latest APK.
- * API base: https://api.163-music-pro.imoow.com
+ * API base: https://163.imoow.com
  */
 public class UpdateChecker {
 
-    private static final String BASE_URL = "https://api.163-music-pro.imoow.com";
+    private static final String BASE_URL = "https://163.imoow.com";
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public interface CheckCallback {
