@@ -221,6 +221,18 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    /** Callback for lightweight playlist metadata fetch */
+    public interface PlaylistMetaCallback {
+        void onResult(int trackCount, String creator, long creatorUserId, int specialType, boolean subscribed);
+        void onError(String message);
+    }
+
+    /** Callback for playlist detail that also returns metadata */
+    public interface PlaylistDetailWithMetaCallback {
+        void onResult(List<Song> songs, int trackCount, String creator, long creatorUserId, int specialType, boolean subscribed);
+        void onError(String message);
+    }
+
     // ==================== Search ====================
 
     public static void searchSongs(String keyword, String cookie, SearchCallback callback) {
@@ -322,11 +334,16 @@ public class MusicApiHelper {
                             String name = p.getString("name");
                             int trackCount = p.optInt("trackCount", 0);
                             String creator = "";
+                            long creatorUserId = 0;
                             JSONObject creatorObj = p.optJSONObject("creator");
                             if (creatorObj != null) {
                                 creator = creatorObj.optString("nickname", "");
+                                creatorUserId = creatorObj.optLong("userId", 0);
                             }
-                            playlists.add(new PlaylistInfo(id, name, trackCount, creator));
+                            int specialType = p.optInt("specialType", 0);
+                            boolean subscribed = p.optBoolean("subscribed", false);
+                            playlists.add(new PlaylistInfo(id, name, trackCount, creator,
+                                    creatorUserId, subscribed, String.valueOf(specialType)));
                         }
                     }
                 }
@@ -1312,6 +1329,99 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onResult(songs));
             } catch (Exception e) {
                 MusicLog.w(TAG, "获取歌单详情失败: " + playlistId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /**
+     * Get playlist detail with metadata (tracks + creator/specialType info).
+     * Used by PlaylistDetailActivity to self-correct metadata from API.
+     */
+    public static void getPlaylistDetailWithMeta(long playlistId, String cookie, PlaylistDetailWithMetaCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("id", playlistId);
+                data.put("n", 0);
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/v6/playlist/detail", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONObject playlist = json.optJSONObject("playlist");
+                if (playlist == null) {
+                    mainHandler.post(() -> callback.onError("获取歌单详情失败"));
+                    return;
+                }
+
+                // Extract metadata
+                int apiTrackCount = playlist.optInt("trackCount", 0);
+                String creatorName = "";
+                long creatorUserId = 0;
+                JSONObject creatorObj = playlist.optJSONObject("creator");
+                if (creatorObj != null) {
+                    creatorName = creatorObj.optString("nickname", "");
+                    creatorUserId = creatorObj.optLong("userId", 0);
+                }
+                int specialType = playlist.optInt("specialType", 0);
+                boolean subscribed = playlist.optBoolean("subscribed", false);
+
+                // Extract songs
+                JSONArray trackIds = playlist.optJSONArray("trackIds");
+                List<Song> songs;
+                if (trackIds == null || trackIds.length() == 0) {
+                    songs = new ArrayList<>();
+                } else {
+                    songs = fetchSongDetailsByTrackIds(trackIds, csrfToken, cookie);
+                }
+
+                final String cn = creatorName;
+                final long cuid = creatorUserId;
+                mainHandler.post(() -> callback.onResult(songs, apiTrackCount, cn, cuid, specialType, subscribed));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取歌单详情失败: " + playlistId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /**
+     * Get playlist metadata only (lightweight, no tracks).
+     * Used by FavoritesListActivity to refresh track counts for locally saved playlists.
+     */
+    public static void getPlaylistMeta(long playlistId, String cookie, PlaylistMetaCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("id", playlistId);
+                data.put("n", 0);
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/v6/playlist/detail", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONObject playlist = json.optJSONObject("playlist");
+                if (playlist == null) {
+                    mainHandler.post(() -> callback.onError("获取歌单信息失败"));
+                    return;
+                }
+
+                int trackCount = playlist.optInt("trackCount", 0);
+                String creatorName = "";
+                long creatorUserId = 0;
+                JSONObject creatorObj = playlist.optJSONObject("creator");
+                if (creatorObj != null) {
+                    creatorName = creatorObj.optString("nickname", "");
+                    creatorUserId = creatorObj.optLong("userId", 0);
+                }
+                int specialType = playlist.optInt("specialType", 0);
+                boolean subscribed = playlist.optBoolean("subscribed", false);
+
+                final String cn = creatorName;
+                final long cuid = creatorUserId;
+                mainHandler.post(() -> callback.onResult(trackCount, cn, cuid, specialType, subscribed));
+            } catch (Exception e) {
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });

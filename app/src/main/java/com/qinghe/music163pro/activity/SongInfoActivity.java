@@ -862,6 +862,8 @@ public class SongInfoActivity extends AppCompatActivity {
         intent.putExtra("playlist_name", name != null ? name : "");
         intent.putExtra("track_count", trackCount);
         intent.putExtra("creator", creator != null ? creator : "");
+        // creator_user_id and is_liked_playlist not available from simiPlaylist API;
+        // PlaylistDetailActivity will self-correct from API response
         startActivity(intent);
     }
 

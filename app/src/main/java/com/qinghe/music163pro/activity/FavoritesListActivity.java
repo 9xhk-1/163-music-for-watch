@@ -249,6 +249,36 @@ public class FavoritesListActivity extends AppCompatActivity {
         playlistsList.addAll(playlistManager.getPlaylists());
         playlistAdapter.notifyDataSetChanged();
         updateEmptyState();
+
+        // Refresh track counts and creator info from API for each locally saved playlist
+        String cookie = playerManager.getCookie();
+        if (cookie != null && !cookie.isEmpty()) {
+            for (int i = 0; i < playlistsList.size(); i++) {
+                final int index = i;
+                PlaylistInfo pl = playlistsList.get(i);
+                MusicApiHelper.getPlaylistMeta(pl.getId(), cookie, new MusicApiHelper.PlaylistMetaCallback() {
+                    @Override
+                    public void onResult(int trackCount, String creator, long creatorUserId,
+                                         int specialType, boolean subscribed) {
+                        if (index < playlistsList.size() && playlistsList.get(index).getId() == pl.getId()) {
+                            PlaylistInfo updated = playlistsList.get(index);
+                            updated.setTrackCount(trackCount);
+                            if (creator != null && !creator.isEmpty()) {
+                                updated.setCreator(creator);
+                            }
+                            playlistAdapter.notifyDataSetChanged();
+                            // Update local storage with refreshed data
+                            playlistManager.updatePlaylistMeta(pl.getId(), trackCount, creator);
+                        }
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        // Silently ignore - display local data as fallback
+                    }
+                });
+            }
+        }
     }
 
     private void loadCloudPlaylists() {

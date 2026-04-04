@@ -54,6 +54,28 @@ public class PlaylistManager {
         return false;
     }
 
+    /**
+     * Update a locally saved playlist's metadata (track count, creator).
+     * Does nothing if the playlist is not in local storage.
+     */
+    public void updatePlaylistMeta(long playlistId, int trackCount, String creator) {
+        List<PlaylistInfo> list = getPlaylists();
+        boolean changed = false;
+        for (PlaylistInfo p : list) {
+            if (p.getId() == playlistId) {
+                p.setTrackCount(trackCount);
+                if (creator != null && !creator.isEmpty()) {
+                    p.setCreator(creator);
+                }
+                changed = true;
+                break;
+            }
+        }
+        if (changed) {
+            savePlaylists(list);
+        }
+    }
+
     public List<PlaylistInfo> getPlaylists() {
         List<PlaylistInfo> list = new ArrayList<>();
         try {

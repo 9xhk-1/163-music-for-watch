@@ -46,6 +46,7 @@ public class PlaylistDetailActivity extends AppCompatActivity {
     private PlaylistManager playlistManager;
     private TextView tvStatus;
     private TextView tvTitle;
+    private TextView tvCreatorLabel;
     private TextView btnFav;
     private TextView btnDelete;
     private long playlistId;
@@ -138,16 +139,14 @@ public class PlaylistDetailActivity extends AppCompatActivity {
 
         root.addView(titleRow);
 
-        // Creator label
-        if (creator != null && !creator.isEmpty()) {
-            TextView tvCreator = new TextView(this);
-            tvCreator.setText("创建者: " + creator);
-            tvCreator.setTextColor(0xFF888888);
-            tvCreator.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
-            tvCreator.setGravity(Gravity.CENTER);
-            tvCreator.setPadding(0, 0, 0, px(2));
-            root.addView(tvCreator);
-        }
+        // Creator label (always created, visibility depends on data)
+        tvCreatorLabel = new TextView(this);
+        tvCreatorLabel.setTextColor(0xFF888888);
+        tvCreatorLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
+        tvCreatorLabel.setGravity(Gravity.CENTER);
+        tvCreatorLabel.setPadding(0, 0, 0, px(2));
+        updateCreatorLabel();
+        root.addView(tvCreatorLabel);
 
         // Status text
         tvStatus = new TextView(this);
@@ -278,23 +277,46 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         tvTitle.setText(titleText);
     }
 
+    private void updateCreatorLabel() {
+        if (creator != null && !creator.isEmpty()) {
+            tvCreatorLabel.setText("创建者: " + creator);
+            tvCreatorLabel.setVisibility(View.VISIBLE);
+        } else {
+            tvCreatorLabel.setVisibility(View.GONE);
+        }
+    }
+
     private void loadPlaylistDetail(long playlistId) {
         String cookie = playerManager.getCookie();
-        MusicApiHelper.getPlaylistDetail(playlistId, cookie, new MusicApiHelper.PlaylistDetailCallback() {
+        MusicApiHelper.getPlaylistDetailWithMeta(playlistId, cookie, new MusicApiHelper.PlaylistDetailWithMetaCallback() {
             @Override
-            public void onResult(List<Song> songs) {
+            public void onResult(List<Song> songs, int apiTrackCount, String apiCreator,
+                                 long apiCreatorUserId, int specialType, boolean subscribed) {
                 displayList.clear();
                 displayList.addAll(songs);
                 adapter.notifyDataSetChanged();
-                // Update trackCount from actual loaded data
+
+                // Update metadata from API response (self-correct for all entry points)
                 trackCount = songs.size();
+                if (apiCreatorUserId > 0) {
+                    creatorUserId = apiCreatorUserId;
+                }
+                isLikedPlaylist = (specialType == 5);
+                if (apiCreator != null && !apiCreator.isEmpty()) {
+                    creator = apiCreator;
+                }
+
                 updateTitleText();
+                updateCreatorLabel();
                 if (songs.isEmpty()) {
                     tvStatus.setText("暂无歌曲");
                 } else {
                     tvStatus.setText(songs.size() + " 首歌曲");
                     lvSongs.setVisibility(View.VISIBLE);
                 }
+
+                // Refresh buttons with corrected metadata
+                updateActionButtons();
             }
 
             @Override
