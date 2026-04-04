@@ -5,14 +5,16 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.WindowManager;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
+import com.qinghe.music163pro.util.UpdateChecker;
 
 /**
  * Settings activity - flat tile list style matching MoreActivity.
- * Contains: 开关选项, 关于
+ * Contains: 开关选项, 检测更新, 关于
  */
 public class SettingsActivity extends AppCompatActivity {
 
@@ -30,12 +32,34 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         TextView btnToggle = findViewById(R.id.btn_settings_toggle);
+        TextView btnCheckUpdate = findViewById(R.id.btn_settings_check_update);
         TextView btnAbout = findViewById(R.id.btn_settings_about);
 
         btnToggle.setOnClickListener(v ->
                 startActivity(new Intent(this, ToggleSettingsActivity.class)));
 
+        btnCheckUpdate.setOnClickListener(v -> checkUpdateManually());
+
         btnAbout.setOnClickListener(v ->
                 startActivity(new Intent(this, AboutActivity.class)));
+    }
+
+    private void checkUpdateManually() {
+        Toast.makeText(this, "正在检测更新...", Toast.LENGTH_SHORT).show();
+        UpdateChecker.checkVersion(this, new UpdateChecker.CheckCallback() {
+            @Override
+            public void onResult(boolean isLatest) {
+                if (isLatest) {
+                    Toast.makeText(SettingsActivity.this, "当前已是最新版本", Toast.LENGTH_SHORT).show();
+                } else {
+                    startActivity(new Intent(SettingsActivity.this, UpdateActivity.class));
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                Toast.makeText(SettingsActivity.this, "检测失败: " + error, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 }

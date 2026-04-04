@@ -43,6 +43,7 @@ import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.service.MusicPlaybackService;
 import com.qinghe.music163pro.util.MusicLog;
+import com.qinghe.music163pro.util.UpdateChecker;
 
 import java.io.File;
 
@@ -259,6 +260,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Request storage permission for saving favorites to /sdcard/163Music/
         requestStoragePermission();
 
+        // Check for updates once per day on first launch
+        checkUpdateIfNeeded();
+
         // Activity-level gesture detector:
         // - Right swipe: dismiss overlay if one is open; exit app on main player screen
         // - Left swipe: open lyrics overlay (only when no overlay is showing)
@@ -314,6 +318,28 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                             Manifest.permission.READ_EXTERNAL_STORAGE
                     }, STORAGE_PERMISSION_REQUEST);
         }
+    }
+
+    private void checkUpdateIfNeeded() {
+        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        String today = new java.text.SimpleDateFormat("yyyyMMdd",
+                java.util.Locale.getDefault()).format(new java.util.Date());
+        String lastCheck = prefs.getString("last_update_check_date", "");
+        if (today.equals(lastCheck)) return;
+        prefs.edit().putString("last_update_check_date", today).apply();
+        UpdateChecker.checkVersion(this, new UpdateChecker.CheckCallback() {
+            @Override
+            public void onResult(boolean isLatest) {
+                if (!isLatest) {
+                    startActivity(new Intent(MainActivity.this, UpdateActivity.class));
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                // Silently ignore auto-check errors
+            }
+        });
     }
 
     @Override

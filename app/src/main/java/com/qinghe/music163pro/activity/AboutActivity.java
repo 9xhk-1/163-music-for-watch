@@ -47,7 +47,7 @@ public class AboutActivity extends AppCompatActivity {
 
         // Version
         content.addView(makeSpacer(px(4)));
-        String versionName = "20260403-2";
+        String versionName = "20260404";
         try {
             versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) {}
@@ -76,7 +76,21 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeSpacer(px(8)));
         content.addView(makeDivider());
 
-        // v20260403-2 update summary (latest)
+        // v20260404 update summary (latest)
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("v20260404 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText(
+                "• 新增自动更新功能：每天首次打开应用自动检测新版本\n"
+                + "• 发现新版本时弹出更新提示页面，支持一键下载安装\n"
+                + "• 设置页面新增「检测更新」按钮，可手动检查最新版本",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
+        // v20260403-2 update summary
         content.addView(makeSpacer(px(8)));
         content.addView(makeText("v20260403-2 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
         content.addView(makeSpacer(px(4)));
