@@ -61,6 +61,8 @@ public class SongInfoActivity extends AppCompatActivity {
     private LinearLayout contentLayout;
     private TextView tvLoading;
     private String currentBlockCode = "";
+    // Collected similar songs from the current block for playlist filling
+    private final List<Song> currentBlockSongs = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -316,6 +318,9 @@ public class SongInfoActivity extends AppCompatActivity {
             JSONArray blocks = data.optJSONArray("blocks");
             if (blocks == null || blocks.length() == 0) return;
 
+            // Clear accumulated songs before processing all blocks
+            currentBlockSongs.clear();
+
             // Iterate through ALL blocks and display their content
             for (int i = 0; i < blocks.length(); i++) {
                 JSONObject block = blocks.optJSONObject(i);
@@ -332,6 +337,8 @@ public class SongInfoActivity extends AppCompatActivity {
         // API returns "code" field (not "blockCode")
         String blockCode = block.optString("code", "");
         currentBlockCode = blockCode;
+        // Note: don't clear currentBlockSongs here - accumulate all similar songs
+        // so click handlers can reference the full list even after other blocks process
 
         // Get a user-friendly title for the block
         String blockTitle = getBlockTitle(blockCode);
@@ -435,32 +442,41 @@ public class SongInfoActivity extends AppCompatActivity {
             // Some extInfo contains songs array
             JSONArray songs = extInfo.optJSONArray("songs");
             if (songs != null) {
+                // First pass: collect all songs for playlist
+                List<Song> blockSongList = new ArrayList<>();
                 for (int i = 0; i < songs.length(); i++) {
                     JSONObject song = songs.optJSONObject(i);
                     if (song == null) continue;
                     String sName = song.optString("name", "");
+                    // Try "ar" first (v3 format), then "artists" (v1 format)
                     JSONArray ar = song.optJSONArray("ar");
+                    if (ar == null) ar = song.optJSONArray("artists");
                     String sArtist = "";
                     if (ar != null && ar.length() > 0) {
                         sArtist = ar.optJSONObject(0).optString("name", "");
                     }
-                    if (!sName.isEmpty()) {
-                        String display = sArtist.isEmpty() ? sName : sName + " - " + sArtist;
-                        if (isSongBlock) {
-                            final long sId = song.optLong("id", 0);
-                            final String fName = sName;
-                            final String fArtist = sArtist;
-                            TextView tv = makeText("▶ " + display, COLOR_ACCENT, px(14), false, Gravity.START);
-                            tv.setPadding(0, px(2), 0, px(2));
-                            if (sId > 0) {
-                                tv.setOnClickListener(v -> playSongById(sId, fName, fArtist));
-                            }
-                            contentLayout.addView(tv);
-                        } else {
-                            contentLayout.addView(makeText("• " + display, COLOR_TEXT_DESC, px(14), false, Gravity.START));
-                        }
-                        contentLayout.addView(makeSpacer(px(2)));
+                    long sId = song.optLong("id", 0);
+                    if (!sName.isEmpty() && sId > 0) {
+                        blockSongList.add(new Song(sId, sName, sArtist, ""));
                     }
+                }
+                if (isSongBlock) {
+                    currentBlockSongs.addAll(blockSongList);
+                }
+                // Second pass: display
+                for (int i = 0; i < blockSongList.size(); i++) {
+                    Song s = blockSongList.get(i);
+                    String display = s.getArtist().isEmpty() ? s.getName() : s.getName() + " - " + s.getArtist();
+                    if (isSongBlock) {
+                        final int idx = currentBlockSongs.size() - blockSongList.size() + i;
+                        TextView tv = makeText("▶ " + display, COLOR_ACCENT, px(14), false, Gravity.START);
+                        tv.setPadding(0, px(2), 0, px(2));
+                        tv.setOnClickListener(v -> playSimilarSongs(currentBlockSongs, idx));
+                        contentLayout.addView(tv);
+                    } else {
+                        contentLayout.addView(makeText("• " + display, COLOR_TEXT_DESC, px(14), false, Gravity.START));
+                    }
+                    contentLayout.addView(makeSpacer(px(2)));
                 }
                 return;
             }
@@ -480,11 +496,12 @@ public class SongInfoActivity extends AppCompatActivity {
                         }
                         if (isPlaylistBlock) {
                             final long plId = pl.optLong("id", 0);
-                            final String fDisplay = display;
-                            TextView tv = makeText("📋 " + fDisplay, COLOR_ACCENT, px(14), false, Gravity.START);
+                            final String fPlName = plName;
+                            final int fTrackCount = pl.optInt("trackCount", 0);
+                            TextView tv = makeText("📋 " + display, COLOR_ACCENT, px(14), false, Gravity.START);
                             tv.setPadding(0, px(2), 0, px(2));
                             if (plId > 0) {
-                                tv.setOnClickListener(v -> loadAndPlayPlaylist(plId));
+                                tv.setOnClickListener(v -> openPlaylistDetail(plId, fPlName, fTrackCount, ""));
                             }
                             contentLayout.addView(tv);
                         } else {
@@ -666,28 +683,41 @@ public class SongInfoActivity extends AppCompatActivity {
                 String resArtist = "";
                 if (resInfo != null) {
                     JSONArray ars = resInfo.optJSONArray("artist");
+                    if (ars == null) ars = resInfo.optJSONArray("artists");
                     if (ars != null && ars.length() > 0) {
                         JSONObject a0 = ars.optJSONObject(0);
                         if (a0 != null) resArtist = a0.optString("name", "");
                     }
                 }
+                if (resId > 0) {
+                    currentBlockSongs.add(new Song(resId, resName, resArtist, ""));
+                }
                 card.addView(makeSmallLabel("▶ 点击播放"));
-                final long finalId = resId;
-                final String finalName = resName;
-                final String finalArtist = resArtist;
-                if (finalId > 0) {
+                final int songIdx = currentBlockSongs.size() - 1;
+                if (resId > 0) {
                     card.setClickable(true);
-                    card.setOnClickListener(v -> playSongById(finalId, finalName, finalArtist));
+                    card.setOnClickListener(v -> playSimilarSongs(currentBlockSongs, songIdx));
                 }
             } else if (isPlaylistBlock) {
                 long plId = resInfo != null ? resInfo.optLong("id", 0) : 0;
                 if (plId <= 0 && extInfo != null) plId = extInfo.optLong("id", 0);
                 if (plId <= 0) plId = parseResourceId(resource);
-                card.addView(makeSmallLabel("📋 点击加入播放列表"));
+                String plName = "";
+                if (resInfo != null) plName = resInfo.optString("name", "");
+                if (plName.isEmpty() && resUiElement != null) {
+                    JSONObject mt = resUiElement.optJSONObject("mainTitle");
+                    if (mt != null) plName = mt.optString("title", "");
+                }
+                int plTrackCount = 0;
+                if (extInfo != null) plTrackCount = extInfo.optInt("trackCount", 0);
+                if (plTrackCount <= 0 && resInfo != null) plTrackCount = resInfo.optInt("trackCount", 0);
+                card.addView(makeSmallLabel("📋 点击查看歌单"));
                 final long finalPlId = plId;
+                final String finalPlName = plName;
+                final int finalPlTrackCount = plTrackCount;
                 if (finalPlId > 0) {
                     card.setClickable(true);
-                    card.setOnClickListener(v -> loadAndPlayPlaylist(finalPlId));
+                    card.setOnClickListener(v -> openPlaylistDetail(finalPlId, finalPlName, finalPlTrackCount, ""));
                 }
             }
             contentLayout.addView(card);
@@ -813,11 +843,12 @@ public class SongInfoActivity extends AppCompatActivity {
 
     // ── Playback helpers ────────────────────────────────────────────────
 
-    private void playSongById(long id, String name, String artist) {
-        Song s = new Song(id, name, artist, "");
-        List<Song> list = new ArrayList<>();
-        list.add(s);
-        MusicPlayerManager.getInstance().setPlaylist(list, 0);
+    /**
+     * Play a song from a captured similar songs list, filling the playlist with all similar songs.
+     */
+    private void playSimilarSongs(List<Song> songList, int index) {
+        if (songList.isEmpty() || index < 0 || index >= songList.size()) return;
+        MusicPlayerManager.getInstance().setPlaylist(new ArrayList<>(songList), index);
         MusicPlayerManager.getInstance().playCurrent();
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -825,28 +856,15 @@ public class SongInfoActivity extends AppCompatActivity {
         finish();
     }
 
-    private void loadAndPlayPlaylist(long playlistId) {
-        Toast.makeText(this, "正在加载歌单...", Toast.LENGTH_SHORT).show();
-        MusicApiHelper.getPlaylistDetail(playlistId, cookie, new MusicApiHelper.PlaylistDetailCallback() {
-            @Override
-            public void onResult(List<Song> songs) {
-                if (songs.isEmpty()) {
-                    Toast.makeText(SongInfoActivity.this, "歌单为空", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                MusicPlayerManager.getInstance().setPlaylist(new ArrayList<>(songs), 0);
-                MusicPlayerManager.getInstance().playCurrent();
-                Intent intent = new Intent(SongInfoActivity.this, MainActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                startActivity(intent);
-                finish();
-            }
-
-            @Override
-            public void onError(String message) {
-                Toast.makeText(SongInfoActivity.this, "加载歌单失败: " + message, Toast.LENGTH_SHORT).show();
-            }
-        });
+    private void openPlaylistDetail(long playlistId, String name, int trackCount, String creator) {
+        Intent intent = new Intent(this, PlaylistDetailActivity.class);
+        intent.putExtra("playlist_id", playlistId);
+        intent.putExtra("playlist_name", name != null ? name : "");
+        intent.putExtra("track_count", trackCount);
+        intent.putExtra("creator", creator != null ? creator : "");
+        // creator_user_id and is_liked_playlist not available from simiPlaylist API;
+        // PlaylistDetailActivity will self-correct from API response
+        startActivity(intent);
     }
 
     // ── UI helpers ──────────────────────────────────────────────────────

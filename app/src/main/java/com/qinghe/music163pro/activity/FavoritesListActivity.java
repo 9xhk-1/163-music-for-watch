@@ -3,10 +3,13 @@ package com.qinghe.music163pro.activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -16,6 +19,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.FavoritesManager;
+import com.qinghe.music163pro.manager.PlaylistManager;
+import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 
@@ -23,37 +28,48 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Favorites list activity - shows all favorited songs.
- * Supports both local and cloud favorites modes.
+ * Favorites list activity - shows favorited songs and playlists.
+ * Supports both local and cloud modes, with tabs for songs and playlists.
  */
 public class FavoritesListActivity extends AppCompatActivity {
 
     private final List<Song> favoritesList = new ArrayList<>();
-    private ArrayAdapter<Song> adapter;
+    private final List<PlaylistInfo> playlistsList = new ArrayList<>();
+    private ArrayAdapter<Song> songAdapter;
+    private ArrayAdapter<PlaylistInfo> playlistAdapter;
     private FavoritesManager favoritesManager;
+    private PlaylistManager playlistManager;
     private MusicPlayerManager playerManager;
-    private TextView tvTitle;
     private TextView tvEmpty;
     private ListView lvFavorites;
+    private ListView lvFavPlaylists;
+    private TextView tabFavSongs;
+    private TextView tabFavPlaylists;
+
+    private boolean isSongTab = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_favorites_list);
 
-        // Apply keep screen on setting
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         if (prefs.getBoolean("keep_screen_on", false)) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
         lvFavorites = findViewById(R.id.lv_favorites);
+        lvFavPlaylists = findViewById(R.id.lv_fav_playlists);
         tvEmpty = findViewById(R.id.tv_empty);
+        tabFavSongs = findViewById(R.id.tab_fav_songs);
+        tabFavPlaylists = findViewById(R.id.tab_fav_playlists);
 
         favoritesManager = new FavoritesManager(this);
+        playlistManager = new PlaylistManager();
         playerManager = MusicPlayerManager.getInstance();
 
-        adapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, favoritesList) {
+        // Song adapter
+        songAdapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, favoritesList) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
@@ -67,27 +83,108 @@ public class FavoritesListActivity extends AppCompatActivity {
                 return view;
             }
         };
-        lvFavorites.setAdapter(adapter);
+        lvFavorites.setAdapter(songAdapter);
+
+        // Playlist adapter
+        playlistAdapter = new ArrayAdapter<PlaylistInfo>(this, R.layout.item_playlist, R.id.tv_playlist_name, playlistsList) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                PlaylistInfo pl = getItem(position);
+                if (pl != null) {
+                    TextView tvName = view.findViewById(R.id.tv_playlist_name);
+                    TextView tvInfo = view.findViewById(R.id.tv_playlist_info);
+                    tvName.setText(pl.getName());
+                    String info = pl.getTrackCount() + "\u9996";
+                    if (pl.getCreator() != null && !pl.getCreator().isEmpty()) {
+                        info += " \u00b7 " + pl.getCreator();
+                    }
+                    tvInfo.setText(info);
+                }
+                return view;
+            }
+        };
+        lvFavPlaylists.setAdapter(playlistAdapter);
+
+        // Tab click handlers
+        tabFavSongs.setOnClickListener(v -> switchToSongTab());
+        tabFavPlaylists.setOnClickListener(v -> switchToPlaylistTab());
 
         lvFavorites.setOnItemClickListener((parent, view, position, id) -> {
             Song song = favoritesList.get(position);
             List<Song> playlist = new ArrayList<>(favoritesList);
             playerManager.setPlaylist(playlist, position);
             playerManager.playCurrent();
-            // Navigate back to MainActivity (player screen)
             Intent intent = new Intent(this, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             startActivity(intent);
             finish();
         });
 
-        loadFavorites();
+        lvFavPlaylists.setOnItemClickListener((parent, view, position, id) -> {
+            PlaylistInfo pl = playlistsList.get(position);
+            Intent intent = new Intent(this, PlaylistDetailActivity.class);
+            intent.putExtra("playlist_id", pl.getId());
+            intent.putExtra("playlist_name", pl.getName());
+            intent.putExtra("track_count", pl.getTrackCount());
+            intent.putExtra("creator", pl.getCreator());
+            intent.putExtra("creator_user_id", pl.getUserId());
+            intent.putExtra("is_liked_playlist", pl.isLikedPlaylist());
+            startActivity(intent);
+        });
+
+        // Long press to delete playlist from local (with confirmation)
+        lvFavPlaylists.setOnItemLongClickListener((parent, view, position, id) -> {
+            SharedPreferences settingsPrefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+            boolean isCloud = settingsPrefs.getBoolean("fav_mode_cloud", false);
+            if (!isCloud) {
+                PlaylistInfo pl = playlistsList.get(position);
+                showConfirmDialog("确认删除", "确定删除歌单「" + pl.getName() + "」？", () -> {
+                    playlistManager.removePlaylist(pl.getId());
+                    playlistsList.remove(position);
+                    playlistAdapter.notifyDataSetChanged();
+                    updateEmptyState();
+                    Toast.makeText(this, "\u5df2\u5220\u9664\u6b4c\u5355", Toast.LENGTH_SHORT).show();
+                });
+            }
+            return true;
+        });
+
+        loadData();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        loadFavorites();
+        loadData();
+    }
+
+    private void switchToSongTab() {
+        isSongTab = true;
+        tabFavSongs.setBackgroundColor(getResources().getColor(R.color.colorPrimary));
+        tabFavSongs.setTextColor(0xFFFFFFFF);
+        tabFavPlaylists.setBackgroundColor(0xFF424242);
+        tabFavPlaylists.setTextColor(0xFFAAAAAA);
+        lvFavPlaylists.setVisibility(View.GONE);
+        loadData();
+    }
+
+    private void switchToPlaylistTab() {
+        isSongTab = false;
+        tabFavPlaylists.setBackgroundColor(getResources().getColor(R.color.colorPrimary));
+        tabFavPlaylists.setTextColor(0xFFFFFFFF);
+        tabFavSongs.setBackgroundColor(0xFF424242);
+        tabFavSongs.setTextColor(0xFFAAAAAA);
+        lvFavorites.setVisibility(View.GONE);
+        loadPlaylists();
+    }
+
+    private void loadData() {
+        if (isSongTab) {
+            loadFavorites();
+        } else {
+            loadPlaylists();
+        }
     }
 
     private void loadFavorites() {
@@ -104,20 +201,20 @@ public class FavoritesListActivity extends AppCompatActivity {
     private void loadLocalFavorites() {
         favoritesList.clear();
         favoritesList.addAll(favoritesManager.getFavorites());
-        adapter.notifyDataSetChanged();
+        songAdapter.notifyDataSetChanged();
         updateEmptyState();
     }
 
     private void loadCloudFavorites() {
         favoritesList.clear();
-        adapter.notifyDataSetChanged();
-        tvEmpty.setText("正在加载云端收藏...");
+        songAdapter.notifyDataSetChanged();
+        tvEmpty.setText("\u6b63\u5728\u52a0\u8f7d\u4e91\u7aef\u6536\u85cf...");
         tvEmpty.setVisibility(View.VISIBLE);
         lvFavorites.setVisibility(View.GONE);
 
         String cookie = playerManager.getCookie();
         if (cookie == null || cookie.isEmpty()) {
-            tvEmpty.setText("请先登录以使用云端收藏");
+            tvEmpty.setText("\u8bf7\u5148\u767b\u5f55\u4ee5\u4f7f\u7528\u4e91\u7aef\u6536\u85cf");
             return;
         }
 
@@ -126,27 +223,210 @@ public class FavoritesListActivity extends AppCompatActivity {
             public void onResult(List<Song> songs) {
                 favoritesList.clear();
                 favoritesList.addAll(songs);
-                adapter.notifyDataSetChanged();
-                tvEmpty.setText("暂无云端收藏");
+                songAdapter.notifyDataSetChanged();
+                tvEmpty.setText("\u6682\u65e0\u4e91\u7aef\u6536\u85cf");
                 updateEmptyState();
             }
 
             @Override
             public void onError(String message) {
-                tvEmpty.setText("加载失败: " + message);
+                tvEmpty.setText("\u52a0\u8f7d\u5931\u8d25: " + message);
                 tvEmpty.setVisibility(View.VISIBLE);
                 lvFavorites.setVisibility(View.GONE);
             }
         });
     }
 
-    private void updateEmptyState() {
-        if (favoritesList.isEmpty()) {
-            tvEmpty.setVisibility(View.VISIBLE);
-            lvFavorites.setVisibility(View.GONE);
+    private void loadPlaylists() {
+        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        boolean isCloud = prefs.getBoolean("fav_mode_cloud", false);
+
+        if (isCloud) {
+            loadCloudPlaylists();
         } else {
-            tvEmpty.setVisibility(View.GONE);
-            lvFavorites.setVisibility(View.VISIBLE);
+            loadLocalPlaylists();
         }
+    }
+
+    private void loadLocalPlaylists() {
+        playlistsList.clear();
+        playlistsList.addAll(playlistManager.getPlaylists());
+        playlistAdapter.notifyDataSetChanged();
+        updateEmptyState();
+
+        // Refresh track counts and creator info from API for each locally saved playlist
+        String cookie = playerManager.getCookie();
+        if (cookie != null && !cookie.isEmpty()) {
+            for (int i = 0; i < playlistsList.size(); i++) {
+                final long plId = playlistsList.get(i).getId();
+                MusicApiHelper.getPlaylistMeta(plId, cookie, new MusicApiHelper.PlaylistMetaCallback() {
+                    @Override
+                    public void onResult(int trackCount, String creator, long creatorUserId,
+                                         int specialType, boolean subscribed) {
+                        // Find playlist by ID (safe even if list was reordered)
+                        for (int j = 0; j < playlistsList.size(); j++) {
+                            if (playlistsList.get(j).getId() == plId) {
+                                PlaylistInfo updated = playlistsList.get(j);
+                                updated.setTrackCount(trackCount);
+                                if (creator != null && !creator.isEmpty()) {
+                                    updated.setCreator(creator);
+                                }
+                                playlistAdapter.notifyDataSetChanged();
+                                playlistManager.updatePlaylistMeta(plId, trackCount, creator);
+                                break;
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        // Silently ignore - display local data as fallback
+                    }
+                });
+            }
+        }
+    }
+
+    private void loadCloudPlaylists() {
+        playlistsList.clear();
+        playlistAdapter.notifyDataSetChanged();
+        tvEmpty.setText("\u6b63\u5728\u52a0\u8f7d\u4e91\u7aef\u6b4c\u5355...");
+        tvEmpty.setVisibility(View.VISIBLE);
+        lvFavPlaylists.setVisibility(View.GONE);
+
+        String cookie = playerManager.getCookie();
+        if (cookie == null || cookie.isEmpty()) {
+            tvEmpty.setText("\u8bf7\u5148\u767b\u5f55\u4ee5\u4f7f\u7528\u4e91\u7aef\u6b4c\u5355");
+            return;
+        }
+
+        MusicApiHelper.getUserPlaylists(cookie, new MusicApiHelper.UserPlaylistsCallback() {
+            @Override
+            public void onResult(List<PlaylistInfo> playlists) {
+                playlistsList.clear();
+                playlistsList.addAll(playlists);
+                playlistAdapter.notifyDataSetChanged();
+                tvEmpty.setText("\u6682\u65e0\u4e91\u7aef\u6b4c\u5355");
+                updateEmptyState();
+            }
+
+            @Override
+            public void onError(String message) {
+                tvEmpty.setText("\u52a0\u8f7d\u5931\u8d25: " + message);
+                tvEmpty.setVisibility(View.VISIBLE);
+                lvFavPlaylists.setVisibility(View.GONE);
+            }
+        });
+    }
+
+    private void updateEmptyState() {
+        if (isSongTab) {
+            if (favoritesList.isEmpty()) {
+                tvEmpty.setVisibility(View.VISIBLE);
+                lvFavorites.setVisibility(View.GONE);
+            } else {
+                tvEmpty.setVisibility(View.GONE);
+                lvFavorites.setVisibility(View.VISIBLE);
+            }
+            lvFavPlaylists.setVisibility(View.GONE);
+        } else {
+            if (playlistsList.isEmpty()) {
+                tvEmpty.setVisibility(View.VISIBLE);
+                lvFavPlaylists.setVisibility(View.GONE);
+            } else {
+                tvEmpty.setVisibility(View.GONE);
+                lvFavPlaylists.setVisibility(View.VISIBLE);
+            }
+            lvFavorites.setVisibility(View.GONE);
+        }
+    }
+
+    /**
+     * Show a confirmation dialog adapted for watch (360x320 px screen).
+     */
+    private void showConfirmDialog(String title, String message, Runnable onConfirm) {
+        FrameLayout rootView = findViewById(android.R.id.content);
+
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlay.setBackgroundColor(0xCC333333);
+
+        LinearLayout dialog = new LinearLayout(this);
+        dialog.setOrientation(LinearLayout.VERTICAL);
+        dialog.setBackgroundColor(0xFF424242);
+        dialog.setPadding(px(16), px(12), px(16), px(12));
+        FrameLayout.LayoutParams dlgParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        dlgParams.gravity = Gravity.CENTER;
+        dlgParams.leftMargin = px(16);
+        dlgParams.rightMargin = px(16);
+        dialog.setLayoutParams(dlgParams);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(0xFFFFFFFF);
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(18));
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, px(6));
+        dialog.addView(tvTitle);
+
+        TextView tvMessage = new TextView(this);
+        tvMessage.setText(message);
+        tvMessage.setTextColor(0xFFCCCCCC);
+        tvMessage.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
+        tvMessage.setGravity(Gravity.CENTER);
+        tvMessage.setPadding(0, 0, 0, px(12));
+        dialog.addView(tvMessage);
+
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setGravity(Gravity.CENTER);
+        dialog.addView(btnRow);
+
+        TextView btnCancel = new TextView(this);
+        btnCancel.setText("取消");
+        btnCancel.setTextColor(0xFFFFFFFF);
+        btnCancel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnCancel.setGravity(Gravity.CENTER);
+        btnCancel.setPadding(px(12), px(8), px(12), px(8));
+        btnCancel.setBackgroundColor(0xFF616161);
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        cancelParams.rightMargin = px(4);
+        btnCancel.setLayoutParams(cancelParams);
+        btnCancel.setClickable(true);
+        btnCancel.setFocusable(true);
+        btnCancel.setOnClickListener(v -> rootView.removeView(overlay));
+        btnRow.addView(btnCancel);
+
+        TextView btnConfirm = new TextView(this);
+        btnConfirm.setText("确定");
+        btnConfirm.setTextColor(0xFFFFFFFF);
+        btnConfirm.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnConfirm.setGravity(Gravity.CENTER);
+        btnConfirm.setPadding(px(12), px(8), px(12), px(8));
+        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        confirmParams.leftMargin = px(4);
+        btnConfirm.setLayoutParams(confirmParams);
+        btnConfirm.setClickable(true);
+        btnConfirm.setFocusable(true);
+        btnConfirm.setOnClickListener(v -> {
+            rootView.removeView(overlay);
+            onConfirm.run();
+        });
+        btnRow.addView(btnConfirm);
+
+        overlay.addView(dialog);
+        overlay.setOnClickListener(v -> rootView.removeView(overlay));
+        dialog.setOnClickListener(v -> { /* consume click */ });
+        rootView.addView(overlay);
+    }
+
+    private int px(int baseValue) {
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        return (int) (baseValue * screenWidth / 320f + 0.5f);
     }
 }

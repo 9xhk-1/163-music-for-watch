@@ -28,6 +28,12 @@ public class MusicPlayerManager {
     private static final String KEY_CURRENT_SONG_JSON = "current_song_json";
     private static final String KEY_PLAYLIST_JSON = "playlist_json";
     private static final String KEY_CURRENT_INDEX = "current_index";
+    private static final String KEY_SOURCE_PLAYLIST_ID = "source_playlist_id";
+    private static final String KEY_SOURCE_PLAYLIST_NAME = "source_playlist_name";
+    private static final String KEY_SOURCE_PLAYLIST_TRACK_COUNT = "source_playlist_track_count";
+    private static final String KEY_SOURCE_PLAYLIST_CREATOR = "source_playlist_creator";
+    private static final String KEY_SOURCE_PLAYLIST_CREATOR_USER_ID = "source_playlist_creator_user_id";
+    private static final String KEY_SOURCE_PLAYLIST_IS_LIKED = "source_playlist_is_liked";
 
     public enum PlayMode {
         LIST_LOOP,      // 列表循环
@@ -57,6 +63,14 @@ public class MusicPlayerManager {
     private long currentlyPlayingSongId = -1;
     private Context appContext;
 
+    // Playlist source tracking: set when playing from a playlist
+    private long sourcePlaylistId = -1;
+    private String sourcePlaylistName;
+    private int sourcePlaylistTrackCount;
+    private String sourcePlaylistCreator;
+    private long sourcePlaylistCreatorUserId;
+    private boolean sourcePlaylistIsLiked;
+
     private MusicPlayerManager() {}
 
     public static synchronized MusicPlayerManager getInstance() {
@@ -78,8 +92,43 @@ public class MusicPlayerManager {
         playlist.clear();
         playlist.addAll(songs);
         currentIndex = startIndex;
+        // Clear playlist source when setting a new playlist without source info
+        sourcePlaylistId = -1;
+        sourcePlaylistName = null;
+        sourcePlaylistTrackCount = 0;
+        sourcePlaylistCreator = null;
+        sourcePlaylistCreatorUserId = -1;
+        sourcePlaylistIsLiked = false;
         savePlaybackState();
     }
+
+    /**
+     * Set playlist with source playlist info (for tracking which playlist is being played).
+     */
+    public void setPlaylistFromSource(List<Song> songs, int startIndex,
+                                       long playlistId, String playlistName,
+                                       int trackCount, String creator,
+                                       long creatorUserId, boolean isLiked) {
+        playlist.clear();
+        playlist.addAll(songs);
+        currentIndex = startIndex;
+        sourcePlaylistId = playlistId;
+        sourcePlaylistName = playlistName;
+        sourcePlaylistTrackCount = trackCount;
+        sourcePlaylistCreator = creator;
+        sourcePlaylistCreatorUserId = creatorUserId;
+        sourcePlaylistIsLiked = isLiked;
+        savePlaybackState();
+    }
+
+    public long getSourcePlaylistId() { return sourcePlaylistId; }
+    public String getSourcePlaylistName() { return sourcePlaylistName; }
+    public int getSourcePlaylistTrackCount() { return sourcePlaylistTrackCount; }
+    public String getSourcePlaylistCreator() { return sourcePlaylistCreator; }
+    public long getSourcePlaylistCreatorUserId() { return sourcePlaylistCreatorUserId; }
+    public boolean getSourcePlaylistIsLiked() { return sourcePlaylistIsLiked; }
+
+    public boolean hasSourcePlaylist() { return sourcePlaylistId > 0; }
 
     public List<Song> getPlaylist() {
         return playlist;
@@ -504,6 +553,15 @@ public class MusicPlayerManager {
             }
             editor.putString(KEY_PLAYLIST_JSON, playlistArr.toString());
             editor.putInt(KEY_CURRENT_INDEX, currentIndex);
+
+            // Save source playlist info
+            editor.putLong(KEY_SOURCE_PLAYLIST_ID, sourcePlaylistId);
+            editor.putString(KEY_SOURCE_PLAYLIST_NAME, sourcePlaylistName);
+            editor.putInt(KEY_SOURCE_PLAYLIST_TRACK_COUNT, sourcePlaylistTrackCount);
+            editor.putString(KEY_SOURCE_PLAYLIST_CREATOR, sourcePlaylistCreator);
+            editor.putLong(KEY_SOURCE_PLAYLIST_CREATOR_USER_ID, sourcePlaylistCreatorUserId);
+            editor.putBoolean(KEY_SOURCE_PLAYLIST_IS_LIKED, sourcePlaylistIsLiked);
+
             editor.apply();
         } catch (Exception e) {
             Log.w(TAG, "Error saving playback state", e);
@@ -546,6 +604,14 @@ public class MusicPlayerManager {
             } else {
                 currentIndex = 0;
             }
+
+            // Restore source playlist info
+            sourcePlaylistId = prefs.getLong(KEY_SOURCE_PLAYLIST_ID, -1);
+            sourcePlaylistName = prefs.getString(KEY_SOURCE_PLAYLIST_NAME, null);
+            sourcePlaylistTrackCount = prefs.getInt(KEY_SOURCE_PLAYLIST_TRACK_COUNT, 0);
+            sourcePlaylistCreator = prefs.getString(KEY_SOURCE_PLAYLIST_CREATOR, null);
+            sourcePlaylistCreatorUserId = prefs.getLong(KEY_SOURCE_PLAYLIST_CREATOR_USER_ID, 0);
+            sourcePlaylistIsLiked = prefs.getBoolean(KEY_SOURCE_PLAYLIST_IS_LIKED, false);
 
             return true;
         } catch (Exception e) {

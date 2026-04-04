@@ -47,7 +47,7 @@ public class AboutActivity extends AppCompatActivity {
 
         // Version
         content.addView(makeSpacer(px(4)));
-        String versionName = "20260403";
+        String versionName = "20260403-2";
         try {
             versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) {}
@@ -76,7 +76,25 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeSpacer(px(8)));
         content.addView(makeDivider());
 
-        // v20260403 update summary (latest)
+        // v20260403-2 update summary (latest)
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("v20260403-2 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText(
+                "• 修复歌单加入播放列表只有200首的限制，现在有多少首可播放多少首\n"
+                + "• 新增歌单系统：搜索界面支持搜索歌单（单曲/歌单标签切换）\n"
+                + "• 新增歌单系统：收藏列表支持查看收藏歌单（单曲/歌单标签切换）\n"
+                + "• 歌单搜索结果显示歌曲数量，支持无限滚动加载\n"
+                + "• 歌单详情页面支持长按标题收藏/取消收藏歌单\n"
+                + "• 单曲和歌单共用本地/云端模式开关\n"
+                + "• 本地歌单保存到 /sdcard/163Music/playlists.json",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
+        // v20260403 update summary
         content.addView(makeSpacer(px(8)));
         content.addView(makeText("v20260403 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
         content.addView(makeSpacer(px(4)));
