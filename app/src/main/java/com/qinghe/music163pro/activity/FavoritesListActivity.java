@@ -3,10 +3,12 @@ package com.qinghe.music163pro.activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -131,17 +133,19 @@ public class FavoritesListActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        // Long press to delete playlist from local
+        // Long press to delete playlist from local (with confirmation)
         lvFavPlaylists.setOnItemLongClickListener((parent, view, position, id) -> {
             SharedPreferences settingsPrefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
             boolean isCloud = settingsPrefs.getBoolean("fav_mode_cloud", false);
             if (!isCloud) {
                 PlaylistInfo pl = playlistsList.get(position);
-                playlistManager.removePlaylist(pl.getId());
-                playlistsList.remove(position);
-                playlistAdapter.notifyDataSetChanged();
-                updateEmptyState();
-                Toast.makeText(this, "\u5df2\u5220\u9664\u6b4c\u5355", Toast.LENGTH_SHORT).show();
+                showConfirmDialog("确认删除", "确定删除歌单「" + pl.getName() + "」？", () -> {
+                    playlistManager.removePlaylist(pl.getId());
+                    playlistsList.remove(position);
+                    playlistAdapter.notifyDataSetChanged();
+                    updateEmptyState();
+                    Toast.makeText(this, "\u5df2\u5220\u9664\u6b4c\u5355", Toast.LENGTH_SHORT).show();
+                });
             }
             return true;
         });
@@ -335,5 +339,94 @@ public class FavoritesListActivity extends AppCompatActivity {
             }
             lvFavorites.setVisibility(View.GONE);
         }
+    }
+
+    /**
+     * Show a confirmation dialog adapted for watch (360x320 px screen).
+     */
+    private void showConfirmDialog(String title, String message, Runnable onConfirm) {
+        FrameLayout rootView = findViewById(android.R.id.content);
+
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlay.setBackgroundColor(0xCC333333);
+
+        LinearLayout dialog = new LinearLayout(this);
+        dialog.setOrientation(LinearLayout.VERTICAL);
+        dialog.setBackgroundColor(0xFF424242);
+        dialog.setPadding(px(16), px(12), px(16), px(12));
+        FrameLayout.LayoutParams dlgParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        dlgParams.gravity = Gravity.CENTER;
+        dlgParams.leftMargin = px(16);
+        dlgParams.rightMargin = px(16);
+        dialog.setLayoutParams(dlgParams);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(0xFFFFFFFF);
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(18));
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, px(6));
+        dialog.addView(tvTitle);
+
+        TextView tvMessage = new TextView(this);
+        tvMessage.setText(message);
+        tvMessage.setTextColor(0xFFCCCCCC);
+        tvMessage.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
+        tvMessage.setGravity(Gravity.CENTER);
+        tvMessage.setPadding(0, 0, 0, px(12));
+        dialog.addView(tvMessage);
+
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setGravity(Gravity.CENTER);
+        dialog.addView(btnRow);
+
+        TextView btnCancel = new TextView(this);
+        btnCancel.setText("取消");
+        btnCancel.setTextColor(0xFFFFFFFF);
+        btnCancel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnCancel.setGravity(Gravity.CENTER);
+        btnCancel.setPadding(px(12), px(8), px(12), px(8));
+        btnCancel.setBackgroundColor(0xFF616161);
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        cancelParams.rightMargin = px(4);
+        btnCancel.setLayoutParams(cancelParams);
+        btnCancel.setClickable(true);
+        btnCancel.setFocusable(true);
+        btnCancel.setOnClickListener(v -> rootView.removeView(overlay));
+        btnRow.addView(btnCancel);
+
+        TextView btnConfirm = new TextView(this);
+        btnConfirm.setText("确定");
+        btnConfirm.setTextColor(0xFFFFFFFF);
+        btnConfirm.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnConfirm.setGravity(Gravity.CENTER);
+        btnConfirm.setPadding(px(12), px(8), px(12), px(8));
+        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        confirmParams.leftMargin = px(4);
+        btnConfirm.setLayoutParams(confirmParams);
+        btnConfirm.setClickable(true);
+        btnConfirm.setFocusable(true);
+        btnConfirm.setOnClickListener(v -> {
+            rootView.removeView(overlay);
+            onConfirm.run();
+        });
+        btnRow.addView(btnConfirm);
+
+        overlay.addView(dialog);
+        overlay.setOnClickListener(v -> rootView.removeView(overlay));
+        dialog.setOnClickListener(v -> { /* consume click */ });
+        rootView.addView(overlay);
+    }
+
+    private int px(int baseValue) {
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        return (int) (baseValue * screenWidth / 320f + 0.5f);
     }
 }

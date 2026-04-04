@@ -1,6 +1,5 @@
 package com.qinghe.music163pro.activity;
 
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -9,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -198,49 +198,45 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         });
 
         // Long-press to delete song from user's created playlist (not liked playlist)
+        // Works in both cloud and local mode (playlist lives on server regardless)
         lvSongs.setOnItemLongClickListener((parent, view, position, id) -> {
-            if (!isCloudMode || isLikedPlaylist) return false;
+            if (isLikedPlaylist) return false;
             if (creatorUserId <= 0 || creatorUserId != currentUserId) return false;
 
             Song song = displayList.get(position);
-            new AlertDialog.Builder(this)
-                    .setTitle("删除歌曲")
-                    .setMessage("确定要从歌单中删除「" + song.getName() + "」吗？")
-                    .setPositiveButton("删除", (d, w) -> {
-                        String cookie = playerManager.getCookie();
-                        if (cookie == null || cookie.isEmpty()) {
-                            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        Toast.makeText(this, "正在删除...", Toast.LENGTH_SHORT).show();
-                        MusicApiHelper.playlistTracks("del", playlistId,
-                                new long[]{song.getId()}, cookie,
-                                new MusicApiHelper.PlaylistActionCallback() {
-                                    @Override
-                                    public void onResult(boolean success) {
-                                        if (success) {
-                                            displayList.remove(position);
-                                            adapter.notifyDataSetChanged();
-                                            trackCount = displayList.size();
-                                            updateTitleText();
-                                            tvStatus.setText(trackCount + " 首歌曲");
-                                            Toast.makeText(PlaylistDetailActivity.this,
-                                                    "已删除", Toast.LENGTH_SHORT).show();
-                                        } else {
-                                            Toast.makeText(PlaylistDetailActivity.this,
-                                                    "删除失败", Toast.LENGTH_SHORT).show();
-                                        }
-                                    }
+            showConfirmDialog("确认删除", "确定从歌单中删除「" + song.getName() + "」？", () -> {
+                String cookie = playerManager.getCookie();
+                if (cookie == null || cookie.isEmpty()) {
+                    Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Toast.makeText(this, "正在删除...", Toast.LENGTH_SHORT).show();
+                MusicApiHelper.playlistTracks("del", playlistId,
+                        new long[]{song.getId()}, cookie,
+                        new MusicApiHelper.PlaylistActionCallback() {
+                            @Override
+                            public void onResult(boolean success) {
+                                if (success) {
+                                    displayList.remove(position);
+                                    adapter.notifyDataSetChanged();
+                                    trackCount = displayList.size();
+                                    updateTitleText();
+                                    tvStatus.setText(trackCount + " 首歌曲");
+                                    Toast.makeText(PlaylistDetailActivity.this,
+                                            "已删除", Toast.LENGTH_SHORT).show();
+                                } else {
+                                    Toast.makeText(PlaylistDetailActivity.this,
+                                            "删除失败", Toast.LENGTH_SHORT).show();
+                                }
+                            }
 
-                                    @Override
-                                    public void onError(String message) {
-                                        Toast.makeText(PlaylistDetailActivity.this,
-                                                "删除失败: " + message, Toast.LENGTH_SHORT).show();
-                                    }
-                                });
-                    })
-                    .setNegativeButton("取消", null)
-                    .show();
+                            @Override
+                            public void onError(String message) {
+                                Toast.makeText(PlaylistDetailActivity.this,
+                                        "删除失败: " + message, Toast.LENGTH_SHORT).show();
+                            }
+                        });
+            });
             return true;
         });
 
@@ -441,35 +437,114 @@ public class PlaylistDetailActivity extends AppCompatActivity {
 
     private void onDeletePlaylist() {
         if (playlistId <= 0) return;
-        new AlertDialog.Builder(this)
-                .setTitle("删除歌单")
-                .setMessage("确定要从云端删除歌单「" + (playlistName != null ? playlistName : "") + "」吗？此操作不可恢复。")
-                .setPositiveButton("删除", (d, w) -> {
-                    Toast.makeText(this, "正在删除...", Toast.LENGTH_SHORT).show();
-                    String cookie = playerManager.getCookie();
-                    MusicApiHelper.deletePlaylist(playlistId, cookie,
-                            new MusicApiHelper.PlaylistActionCallback() {
-                        @Override
-                        public void onResult(boolean success) {
-                            if (success) {
-                                playlistManager.removePlaylist(playlistId);
-                                Toast.makeText(PlaylistDetailActivity.this,
-                                        "已删除歌单", Toast.LENGTH_SHORT).show();
-                                finish();
-                            } else {
-                                Toast.makeText(PlaylistDetailActivity.this,
-                                        "删除失败", Toast.LENGTH_SHORT).show();
-                            }
-                        }
-                        @Override
-                        public void onError(String message) {
-                            Toast.makeText(PlaylistDetailActivity.this,
-                                    "删除失败: " + message, Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        showConfirmDialog("确认删除", "确定从云端删除歌单「" + (playlistName != null ? playlistName : "") + "」？\n此操作不可恢复。", () -> {
+            Toast.makeText(this, "正在删除...", Toast.LENGTH_SHORT).show();
+            String cookie = playerManager.getCookie();
+            MusicApiHelper.deletePlaylist(playlistId, cookie,
+                    new MusicApiHelper.PlaylistActionCallback() {
+                @Override
+                public void onResult(boolean success) {
+                    if (success) {
+                        playlistManager.removePlaylist(playlistId);
+                        Toast.makeText(PlaylistDetailActivity.this,
+                                "已删除歌单", Toast.LENGTH_SHORT).show();
+                        finish();
+                    } else {
+                        Toast.makeText(PlaylistDetailActivity.this,
+                                "删除失败", Toast.LENGTH_SHORT).show();
+                    }
+                }
+                @Override
+                public void onError(String message) {
+                    Toast.makeText(PlaylistDetailActivity.this,
+                            "删除失败: " + message, Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+    }
+
+    /**
+     * Show a confirmation dialog adapted for watch (360x320 px screen).
+     */
+    private void showConfirmDialog(String title, String message, Runnable onConfirm) {
+        FrameLayout rootView = findViewById(android.R.id.content);
+
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlay.setBackgroundColor(0xCC333333);
+
+        LinearLayout dialog = new LinearLayout(this);
+        dialog.setOrientation(LinearLayout.VERTICAL);
+        dialog.setBackgroundColor(0xFF424242);
+        dialog.setPadding(px(16), px(12), px(16), px(12));
+        FrameLayout.LayoutParams dlgParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        dlgParams.gravity = Gravity.CENTER;
+        dlgParams.leftMargin = px(16);
+        dlgParams.rightMargin = px(16);
+        dialog.setLayoutParams(dlgParams);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(0xFFFFFFFF);
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(18));
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, px(6));
+        dialog.addView(tvTitle);
+
+        TextView tvMessage = new TextView(this);
+        tvMessage.setText(message);
+        tvMessage.setTextColor(0xFFCCCCCC);
+        tvMessage.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
+        tvMessage.setGravity(Gravity.CENTER);
+        tvMessage.setPadding(0, 0, 0, px(12));
+        dialog.addView(tvMessage);
+
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setGravity(Gravity.CENTER);
+        dialog.addView(btnRow);
+
+        TextView btnCancel = new TextView(this);
+        btnCancel.setText("取消");
+        btnCancel.setTextColor(0xFFFFFFFF);
+        btnCancel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnCancel.setGravity(Gravity.CENTER);
+        btnCancel.setPadding(px(12), px(8), px(12), px(8));
+        btnCancel.setBackgroundColor(0xFF616161);
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        cancelParams.rightMargin = px(4);
+        btnCancel.setLayoutParams(cancelParams);
+        btnCancel.setClickable(true);
+        btnCancel.setFocusable(true);
+        btnCancel.setOnClickListener(v -> rootView.removeView(overlay));
+        btnRow.addView(btnCancel);
+
+        TextView btnConfirm = new TextView(this);
+        btnConfirm.setText("确定");
+        btnConfirm.setTextColor(0xFFFFFFFF);
+        btnConfirm.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnConfirm.setGravity(Gravity.CENTER);
+        btnConfirm.setPadding(px(12), px(8), px(12), px(8));
+        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        confirmParams.leftMargin = px(4);
+        btnConfirm.setLayoutParams(confirmParams);
+        btnConfirm.setClickable(true);
+        btnConfirm.setFocusable(true);
+        btnConfirm.setOnClickListener(v -> {
+            rootView.removeView(overlay);
+            onConfirm.run();
+        });
+        btnRow.addView(btnConfirm);
+
+        overlay.addView(dialog);
+        overlay.setOnClickListener(v -> rootView.removeView(overlay));
+        dialog.setOnClickListener(v -> { /* consume click */ });
+        rootView.addView(overlay);
     }
 
     private int px(int baseValue) {
