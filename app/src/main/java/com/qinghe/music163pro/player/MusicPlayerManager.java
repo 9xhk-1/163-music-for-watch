@@ -56,9 +56,13 @@ public class MusicPlayerManager {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private PlayMode playMode = PlayMode.LIST_LOOP;
     private float playbackSpeed = 1.0f;
-    /** When true, pitch changes proportionally with speed (sample rate mode).
-     *  When false (default), pitch is preserved (time-stretch mode). */
-    private boolean pitchWithSpeed = false;
+    /**
+     * Speed mode:
+     *  0 = 音调不变 (time-stretch: speed changes, pitch preserved)
+     *  1 = 音调改变但速度不变 (pitch-shift only: pitch changes, speed stays 1.0)
+     *  2 = 音调改变且速度改变 (sample rate: both speed and pitch change)
+     */
+    private int speedMode = 0;
     private final Random random = new Random();
     private long currentlyPlayingSongId = -1;
     private Context appContext;
@@ -171,16 +175,16 @@ public class MusicPlayerManager {
     }
 
     /**
-     * Set whether pitch changes with speed (sample rate mode).
-     * @param pitchWithSpeed true = pitch changes with speed, false = pitch preserved
+     * Set speed mode.
+     * @param speedMode 0=音调不变, 1=音调改变但速度不变, 2=音调改变且速度改变
      */
-    public void setPitchWithSpeed(boolean pitchWithSpeed) {
-        this.pitchWithSpeed = pitchWithSpeed;
+    public void setSpeedMode(int speedMode) {
+        this.speedMode = speedMode;
         applyPlaybackSpeed();
     }
 
-    public boolean isPitchWithSpeed() {
-        return pitchWithSpeed;
+    public int getSpeedMode() {
+        return speedMode;
     }
 
     private void applyPlaybackSpeed() {
@@ -188,10 +192,17 @@ public class MusicPlayerManager {
             try {
                 boolean wasPlaying = mediaPlayer.isPlaying();
                 PlaybackParams params = mediaPlayer.getPlaybackParams();
-                params.setSpeed(playbackSpeed);
-                if (pitchWithSpeed) {
+                if (speedMode == 1) {
+                    // 音调改变但速度不变: pitch shifts, tempo stays at 1.0
+                    params.setSpeed(1.0f);
+                    params.setPitch(playbackSpeed);
+                } else if (speedMode == 2) {
+                    // 音调改变且速度改变: sample rate mode, both change
+                    params.setSpeed(playbackSpeed);
                     params.setPitch(playbackSpeed);
                 } else {
+                    // 音调不变 (mode 0): time-stretch, pitch preserved
+                    params.setSpeed(playbackSpeed);
                     params.setPitch(1.0f);
                 }
                 mediaPlayer.setPlaybackParams(params);
