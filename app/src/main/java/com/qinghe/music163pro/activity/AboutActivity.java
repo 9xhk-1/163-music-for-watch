@@ -80,6 +80,19 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeSpacer(px(8)));
         content.addView(makeDivider());
 
+        // v20260405-2 update summary
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("v20260405-2 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText(
+                "• 变速模式升级为三档：音调不变 / 音调改变但速度不变 / 音调改变且速度改变\n"
+                + "• 播放器适配三种变速模式，实时切换生效",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
         // v20260405 update summary 
         content.addView(makeSpacer(px(8)));
         content.addView(makeText("v20260405 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));

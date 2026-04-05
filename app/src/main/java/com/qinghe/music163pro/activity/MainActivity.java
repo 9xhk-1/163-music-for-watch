@@ -163,8 +163,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             playerManager.setPlayMode(MusicPlayerManager.PlayMode.LIST_LOOP);
         }
 
-        // Load saved speed mode (pitch unchanged vs pitch changed)
-        playerManager.setPitchWithSpeed(prefs.getBoolean("pitch_with_speed", false));
+        // Load saved speed mode (0=音调不变, 1=音调改变但速度不变, 2=音调改变且速度改变)
+        playerManager.setSpeedMode(prefs.getInt("speed_mode", 0));
 
         // Enable marquee
         tvSongName.setSelected(true);
@@ -362,7 +362,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         // Reload speed mode setting
-        playerManager.setPitchWithSpeed(prefs.getBoolean("pitch_with_speed", false));
+        playerManager.setSpeedMode(prefs.getInt("speed_mode", 0));
         // Preload cloud liked IDs cache so overlay shows correct favorite state
         if (prefs.getBoolean("fav_mode_cloud", false)) {
             refreshCloudLikedIds();
