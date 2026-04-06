@@ -203,25 +203,26 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         seekBar.addOnChangeListener(new Slider.OnChangeListener() {
             @Override
-            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+            public void onValueChange(Slider slider, float value, boolean fromUser) {
+                int progress = (int) value;
                 if (fromUser) {
                     int duration = playerManager.getDuration();
                     if (duration > 0) {
-                        tvCurrentTime.setText(formatTime((int) ((long) progress * duration / 1000)));
+                        tvCurrentTime.setText(formatTime((int) ((long) value * duration / 100)));
                     }
                 }
             }
 
             @Override
-            public void onStartTrackingTouch(SeekBar bar) {
+            public void onStartTrackingTouch(Slider slider) {
                 isUserSeeking = true;
             }
 
             @Override
-            public void onStopTrackingTouch(SeekBar bar) {
+            public void onStopTrackingTouch(Slider slider) {
                 int duration = playerManager.getDuration();
                 if (duration > 0) {
-                    int seekPos = (int) ((long) bar.getProgress() * duration / 1000);
+                    int seekPos = (int) ((long) slider.getValue() * duration / 1000);
                     playerManager.seekTo(seekPos);
                 }
                 isUserSeeking = false;
@@ -1725,7 +1726,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         tvStart.setPadding(0, dp(4), 0, 0);
         contentLayout.addView(tvStart);
 
-        SeekBar sbStart = new SeekBar(this);
+        Slider sbStart = new Slider(this);
         sbStart.setMax(totalSec);
         sbStart.setProgress(startSec[0]);
         LinearLayout.LayoutParams seekParams = new LinearLayout.LayoutParams(
@@ -1741,7 +1742,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         tvEnd.setPadding(0, dp(4), 0, 0);
         contentLayout.addView(tvEnd);
 
-        SeekBar sbEnd = new SeekBar(this);
+        Slider sbEnd = new Slider(this);
         sbEnd.setMax(totalSec);
         sbEnd.setProgress(endSec[0]);
         sbEnd.setLayoutParams(seekParams);
@@ -1761,9 +1762,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             tvDuration.setText("节选: " + startSec[0] + "s - " + endSec[0] + "s (" + dur + "秒)");
         };
 
-        sbStart.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        sbStart.addOnChangeListener(new Slider.OnChangeListener() {
             @Override
             public void onValueChange(Slider slider, float value, boolean fromUser) {
+                int progress = (int) value;
                 if (fromUser) {
                     if (progress >= endSec[0]) progress = endSec[0] - 1;
                     if (progress < 0) progress = 0;
@@ -1777,9 +1779,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        sbEnd.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        sbEnd.addOnChangeListener(new Slider.OnChangeListener() {
             @Override
             public void onValueChange(Slider slider, float value, boolean fromUser) {
+                int progress = (int) value;
                 if (fromUser) {
                     if (progress <= startSec[0]) progress = startSec[0] + 1;
                     if (progress > totalSec) progress = totalSec;
