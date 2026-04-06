@@ -1,32 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Material Design 3 Color Scheme - Red (网易云红) -->
+    <!-- Material Design 3 Color Scheme - Dark Theme for Watch -->
     <color name="md_theme_primary">#FFDD2D2D</color>
     <color name="md_theme_onPrimary">#FFFFFFFF</color>
-    <color name="md_theme_primaryContainer">#FFFFDAD6</color>
-    <color name="md_theme_onPrimaryContainer">#FF410002</color>
-    <color name="md_theme_secondary">#FF765857</color>
-    <color name="md_theme_onSecondary">#FFFFFFFF</color>
-    <color name="md_theme_secondaryContainer">#FFFFDAD6</color>
-    <color name="md_theme_onSecondaryContainer">#FF2B1512</color>
-    <color name="md_theme_tertiary">#FF735C2F</color>
-    <color name="md_theme_onTertiary">#FFFFFFFF</color>
-    <color name="md_theme_tertiaryContainer">#FFFFDFBB</color>
-    <color name="md_theme_onTertiaryContainer">#FF271900</color>
-    <color name="md_theme_error">#FFBA1A1A</color>
-    <color name="md_theme_onError">#FFFFFFFF</color>
-    <color name="md_theme_errorContainer">#FFFFDAD6</color>
-    <color name="md_theme_onErrorContainer">#FF410002</color>
-    <color name="md_theme_background">#FF1A1C1E</color>
-    <color name="md_theme_onBackground">#FFE3E2E6</color>
-    <color name="md_theme_surface">#FF1A1C1E</color>
-    <color name="md_theme_onSurface">#FFE3E2E6</color>
-    <color name="md_theme_surfaceVariant">#FF514341</color>
-    <color name="md_theme_onSurfaceVariant">#FFD7C1BF</color>
-    <color name="md_theme_outline">#FFA08C8A</color>
-    <color name="md_theme_outlineVariant">#FF514341</color>
-
-    <!-- Legacy colors (for compatibility) -->
+    <color name="md_theme_primaryContainer">#FF93000A</color>
+    <color name="md_theme_onPrimaryContainer">#FFFFDAD6</color>
+    
+    <color name="md_theme_secondary">#FFE6BBB9</color>
+    <color name="md_theme_onSecondary">#FF442F2D</color>
+    <color name="md_theme_secondaryContainer">#FF5C4140</color>
+    <color name="md_theme_onSecondaryContainer">#FFFFDAD6</color>
+    
+    <color name="md_theme_tertiary">#FFEFC78C</color>
+    <color name="md_theme_onTertiary">#FF422C00</color>
+    <color name="md_theme_tertiaryContainer">#FF5E4200</color>
+    <color name="md_theme_onTertiaryContainer">#FFFFDFBB</color>
+    
+    <color name="md_theme_error">#FFFFB4AB</color>
+    <color name="md_theme_onError">#FF690005</color>
+    <color name="md_theme_errorContainer">#FF93000A</color>
+    <color name="md_theme_onErrorContainer">#FFFFDAD6</color>
+    
+    <color name="md_theme_background">#FF121212</color>
+    <color name="md_theme_onBackground">#FFE6E1E5</color>
+    <color name="md_theme_surface">#FF1C1C1E</color>
+    <color name="md_theme_onSurface">#FFE6E1E5</color>
+    <color name="md_theme_surfaceVariant">#FF2B2930</color>
+    <color name="md_theme_onSurfaceVariant">#FFCAC4D0</color>
+    
+    <color name="md_theme_outline">#FF938F99</color>
+    <color name="md_theme_outlineVariant">#FF49454F</color>
+    <color name="md_theme_inverseSurface">#FFE6E1E5</color>
+    <color name="md_theme_inverseOnSurface">#FF313033</color>
+    <color name="md_theme_inversePrimary">#FFDD2D2D</color>
+    
+    <!-- Legacy colors -->
     <color name="colorPrimary">#FFDD2D2D</color>
     <color name="colorPrimaryDark">#FFB71C1C</color>
     <color name="colorAccent">#FFFF5252</color>
@@ -34,5 +42,5 @@
     <color name="black">#FF000000</color>
     <color name="gray_light">#FFF5F5F5</color>
     <color name="gray_text">#FF757575</color>
-    <color name="bg_dark">#FF212121</color>
+    <color name="bg_dark">#FF121212</color>
 </resources>
