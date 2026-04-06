@@ -3,8 +3,8 @@ package com.qinghe.music163pro.activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.View;
 import android.view.WindowManager;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -31,9 +31,9 @@ public class SettingsActivity extends AppCompatActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
-        TextView btnToggle = findViewById(R.id.btn_settings_toggle);
-        TextView btnCheckUpdate = findViewById(R.id.btn_settings_check_update);
-        TextView btnAbout = findViewById(R.id.btn_settings_about);
+        View btnToggle = findViewById(R.id.btn_settings_toggle);
+        View btnCheckUpdate = findViewById(R.id.btn_settings_check_update);
+        View btnAbout = findViewById(R.id.btn_settings_about);
 
         btnToggle.setOnClickListener(v ->
                 startActivity(new Intent(this, ToggleSettingsActivity.class)));

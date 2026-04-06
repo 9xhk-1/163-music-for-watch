@@ -9,185 +9,298 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="8dp">
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/more"
-            android:textColor="@color/white"
-            android:textSize="15sp"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
             android:textStyle="bold"
+            android:letterSpacing="0.1"
             android:gravity="center"
+            android:paddingTop="4dp"
             android:paddingBottom="8dp" />
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_favorites"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="♥  收藏列表"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_favorite_border"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="收藏列表"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_my_playlists"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="📋  我的歌单"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
             android:focusable="true"
-            android:visibility="gone" />
+            android:background="?attr/selectableItemBackground"
+            android:visibility="gone">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_queue_music"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="我的歌单"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_search"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="🔍  搜索"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_search"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="搜索"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_downloads"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="⬇  下载列表"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_get_app"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="下载列表"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_ringtones"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="🔔  铃声管理"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_notifications"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="铃声管理"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_toplist"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="📊  排行榜"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_leaderboard"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="排行榜"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_history"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="📜  历史记录"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_history"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="历史记录"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_profile"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="👤  个人中心"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
             android:focusable="true"
-            android:visibility="gone" />
+            android:background="?attr/selectableItemBackground"
+            android:visibility="gone">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_person"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="个人中心"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_personal_fm"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="🎵  私人漫游"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
             android:focusable="true"
-            android:visibility="gone" />
+            android:background="?attr/selectableItemBackground"
+            android:visibility="gone">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_music_note"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="私人漫游"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_login"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="🔑  登录"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_vpn_key"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="登录"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/btn_menu_settings"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="⚙  设置"
-            android:textColor="@color/white"
-            android:textSize="14sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_settings"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="设置"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>

@@ -17,35 +17,33 @@
             android:layout_width="0dp"
             android:layout_height="36dp"
             android:layout_weight="1"
-            android:background="@color/gray_light"
+            android:background="@color/surface_elevated"
             android:hint="@string/search_hint"
             android:inputType="text"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
             android:singleLine="true"
-            android:textColor="@color/black"
-            android:textColorHint="@color/gray_text"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_disabled"
             android:textSize="13sp" />
 
-        <TextView
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_search"
             android:layout_width="52dp"
             android:layout_height="36dp"
             android:layout_marginStart="4dp"
-            android:background="@color/colorPrimary"
-            android:gravity="center"
             android:text="@string/search"
-            android:textColor="@color/white"
-            android:textSize="13sp"
-            android:clickable="true"
-            android:focusable="true" />
+            android:textSize="12sp"
+            android:textAllCaps="false"
+            android:padding="0dp"
+            style="@style/Widget.App.Button" />
     </LinearLayout>
 
     <!-- Search type tabs: 单曲 / 歌单 -->
     <LinearLayout
         android:id="@+id/ll_search_tabs"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="32dp"
         android:orientation="horizontal"
         android:layout_marginTop="4dp"
         android:visibility="gone">
@@ -53,27 +51,26 @@
         <TextView
             android:id="@+id/tab_songs"
             android:layout_width="0dp"
-            android:layout_height="30dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
             android:text="单曲"
-            android:textColor="@color/white"
+            android:textColor="@color/colorPrimary"
             android:textSize="13sp"
-            android:background="@color/colorPrimary"
+            android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true" />
 
         <TextView
             android:id="@+id/tab_playlists"
             android:layout_width="0dp"
-            android:layout_height="30dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
             android:gravity="center"
             android:text="歌单"
-            android:textColor="@color/gray_text"
+            android:textColor="@color/text_secondary"
             android:textSize="13sp"
-            android:background="#FF424242"
+            android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true" />
     </LinearLayout>
@@ -85,7 +82,7 @@
         android:layout_height="0dp"
         android:layout_marginTop="4dp"
         android:layout_weight="1"
-        android:divider="@color/gray_text"
+        android:divider="@color/divider"
         android:dividerHeight="0.5dp" />
 
     <!-- Playlist list -->
@@ -95,7 +92,7 @@
         android:layout_height="0dp"
         android:layout_marginTop="4dp"
         android:layout_weight="1"
-        android:divider="@color/gray_text"
+        android:divider="@color/divider"
         android:dividerHeight="0.5dp"
         android:visibility="gone" />
 
@@ -107,6 +104,6 @@
         android:layout_marginTop="4dp"
         android:layout_weight="1"
         android:visibility="gone"
-        android:divider="@color/gray_text"
+        android:divider="@color/divider"
         android:dividerHeight="0.5dp" />
 </LinearLayout>

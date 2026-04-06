@@ -6,30 +6,29 @@
     android:padding="4dp">
 
     <!-- Top left playlist indicator (hidden by default) -->
-    <TextView
+    <ImageView
         android:id="@+id/btn_playlist_indicator"
         android:layout_width="32dp"
         android:layout_height="32dp"
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
-        android:gravity="center"
-        android:text="📋"
-        android:textSize="14sp"
+        android:padding="4dp"
+        android:src="@drawable/ic_queue_music"
+        android:alpha="0.87"
         android:clickable="true"
         android:focusable="true"
         android:visibility="gone" />
 
     <!-- Top right more button -->
-    <TextView
+    <ImageView
         android:id="@+id/btn_more"
         android:layout_width="32dp"
         android:layout_height="32dp"
         android:layout_alignParentEnd="true"
         android:layout_alignParentTop="true"
-        android:gravity="center"
-        android:text="⋮"
-        android:textColor="@color/white"
-        android:textSize="18sp"
+        android:padding="4dp"
+        android:src="@drawable/ic_more_vert"
+        android:alpha="0.87"
         android:clickable="true"
         android:focusable="true" />
 
@@ -55,7 +54,7 @@
             android:marqueeRepeatLimit="marquee_forever"
             android:singleLine="true"
             android:text="@string/no_song"
-            android:textColor="@color/white"
+            android:textColor="@color/text_primary"
             android:textSize="15sp"
             android:textStyle="bold" />
 
@@ -68,7 +67,7 @@
             android:ellipsize="end"
             android:gravity="center"
             android:singleLine="true"
-            android:textColor="@color/gray_text"
+            android:textColor="@color/text_secondary"
             android:textSize="11sp" />
 
         <!-- SeekBar with time labels -->
@@ -84,7 +83,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0:00"
-                android:textColor="@color/gray_text"
+                android:textColor="@color/text_secondary"
                 android:textSize="9sp" />
 
             <SeekBar
@@ -94,15 +93,15 @@
                 android:layout_weight="1"
                 android:max="100"
                 android:progress="0"
-                android:progressTint="@color/colorAccent"
-                android:thumbTint="@color/colorAccent" />
+                android:progressTint="@color/colorPrimary"
+                android:thumbTint="@color/colorPrimary" />
 
             <TextView
                 android:id="@+id/tv_total_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0:00"
-                android:textColor="@color/gray_text"
+                android:textColor="@color/text_secondary"
                 android:textSize="9sp" />
         </LinearLayout>
 
@@ -114,41 +113,38 @@
             android:gravity="center"
             android:orientation="horizontal">
 
-            <TextView
+            <ImageView
                 android:id="@+id/btn_prev"
                 android:layout_width="50dp"
                 android:layout_height="38dp"
-                android:gravity="center"
-                android:text="⏮"
-                android:textColor="@color/white"
-                android:textSize="20sp"
+                android:padding="9dp"
+                android:src="@drawable/ic_skip_previous"
+                android:alpha="0.87"
                 android:clickable="true"
                 android:focusable="true" />
 
-            <TextView
+            <ImageView
                 android:id="@+id/btn_play"
                 android:layout_width="50dp"
                 android:layout_height="38dp"
-                android:gravity="center"
-                android:text="▶"
-                android:textColor="@color/white"
-                android:textSize="24sp"
+                android:padding="7dp"
+                android:src="@drawable/ic_play_arrow"
+                android:alpha="1.0"
                 android:clickable="true"
                 android:focusable="true" />
 
-            <TextView
+            <ImageView
                 android:id="@+id/btn_next"
                 android:layout_width="50dp"
                 android:layout_height="38dp"
-                android:gravity="center"
-                android:text="⏭"
-                android:textColor="@color/white"
-                android:textSize="20sp"
+                android:padding="9dp"
+                android:src="@drawable/ic_skip_next"
+                android:alpha="0.87"
                 android:clickable="true"
                 android:focusable="true" />
         </LinearLayout>
 
-        <!-- Volume controls row -->
+        <!-- Volume / function controls row -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -156,34 +152,33 @@
             android:gravity="center"
             android:orientation="horizontal">
 
-            <TextView
+            <ImageView
                 android:id="@+id/btn_vol_down"
                 android:layout_width="50dp"
                 android:layout_height="36dp"
-                android:gravity="center"
-                android:text="🔉"
-                android:textSize="16sp"
+                android:padding="8dp"
+                android:src="@drawable/ic_volume_down"
+                android:alpha="0.6"
                 android:clickable="true"
                 android:focusable="true" />
 
-            <TextView
+            <ImageView
                 android:id="@+id/btn_favorite"
                 android:layout_width="50dp"
                 android:layout_height="36dp"
-                android:gravity="center"
-                android:text="⋯"
-                android:textColor="@color/colorAccent"
-                android:textSize="20sp"
+                android:padding="8dp"
+                android:src="@drawable/ic_more_horiz"
+                android:colorFilter="@color/colorAccent"
                 android:clickable="true"
                 android:focusable="true" />
 
-            <TextView
+            <ImageView
                 android:id="@+id/btn_vol_up"
                 android:layout_width="50dp"
                 android:layout_height="36dp"
-                android:gravity="center"
-                android:text="🔊"
-                android:textSize="16sp"
+                android:padding="8dp"
+                android:src="@drawable/ic_volume_up"
+                android:alpha="0.6"
                 android:clickable="true"
                 android:focusable="true" />
         </LinearLayout>

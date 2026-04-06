@@ -9,16 +9,19 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="8dp">
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="开关选项"
-            android:textColor="@color/white"
-            android:textSize="15sp"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
             android:textStyle="bold"
+            android:letterSpacing="0.1"
             android:gravity="center"
+            android:paddingTop="4dp"
             android:paddingBottom="8dp" />
 
         <!-- Keep screen on toggle -->
@@ -26,45 +29,42 @@
             android:id="@+id/btn_keep_screen_on"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:textColor="@color/white"
-            android:textSize="14sp"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground" />
 
         <!-- Favorites mode toggle -->
         <TextView
             android:id="@+id/btn_fav_mode"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:textColor="@color/white"
-            android:textSize="14sp"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground" />
 
         <!-- Speed mode toggle -->
         <TextView
             android:id="@+id/btn_speed_mode"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="4dp"
-            android:background="@color/colorPrimary"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:textColor="@color/white"
-            android:textSize="14sp"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground" />
 
     </LinearLayout>
 </ScrollView>

@@ -73,7 +73,7 @@ public class ToggleSettingsActivity extends AppCompatActivity {
 
     private void updateKeepScreenOnText() {
         boolean on = prefs.getBoolean("keep_screen_on", false);
-        btnKeepScreenOn.setText(on ? "💡  屏幕常亮: 已开启" : "🌙  屏幕常亮: 已关闭");
+        btnKeepScreenOn.setText(on ? "屏幕常亮: 已开启" : "屏幕常亮: 已关闭");
     }
 
     private void toggleFavMode() {
@@ -87,7 +87,7 @@ public class ToggleSettingsActivity extends AppCompatActivity {
 
     private void updateFavModeText() {
         boolean isCloud = prefs.getBoolean("fav_mode_cloud", false);
-        btnFavMode.setText(isCloud ? "☁  收藏模式: 云端" : "📱  收藏模式: 本地");
+        btnFavMode.setText(isCloud ? "收藏模式: 云端" : "收藏模式: 本地");
     }
 
     private void toggleSpeedMode() {
@@ -106,6 +106,6 @@ public class ToggleSettingsActivity extends AppCompatActivity {
     private void updateSpeedModeText() {
         int mode = prefs.getInt("speed_mode", 0);
         String[] labels = {"音调不变", "音调改变且速度改变", "音调改变但速度不变"};
-        btnSpeedMode.setText("🎵  变速模式: " + labels[mode]);
+        btnSpeedMode.setText("变速模式: " + labels[mode]);
     }
 }

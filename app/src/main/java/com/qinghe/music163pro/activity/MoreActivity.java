@@ -7,7 +7,6 @@ import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -29,9 +28,9 @@ import java.util.List;
  */
 public class MoreActivity extends AppCompatActivity {
 
-    private TextView btnProfile;
-    private TextView btnPersonalFM;
-    private TextView btnMyPlaylists;
+    private View btnProfile;
+    private View btnPersonalFM;
+    private View btnMyPlaylists;
     private GestureDetector gestureDetector;
 
     @Override
@@ -45,17 +44,17 @@ public class MoreActivity extends AppCompatActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
-        TextView btnFavorites = findViewById(R.id.btn_menu_favorites);
+        View btnFavorites = findViewById(R.id.btn_menu_favorites);
         btnMyPlaylists = findViewById(R.id.btn_menu_my_playlists);
-        TextView btnSearch = findViewById(R.id.btn_menu_search);
-        TextView btnDownloads = findViewById(R.id.btn_menu_downloads);
-        TextView btnRingtones = findViewById(R.id.btn_menu_ringtones);
-        TextView btnTopList = findViewById(R.id.btn_menu_toplist);
-        TextView btnHistory = findViewById(R.id.btn_menu_history);
+        View btnSearch = findViewById(R.id.btn_menu_search);
+        View btnDownloads = findViewById(R.id.btn_menu_downloads);
+        View btnRingtones = findViewById(R.id.btn_menu_ringtones);
+        View btnTopList = findViewById(R.id.btn_menu_toplist);
+        View btnHistory = findViewById(R.id.btn_menu_history);
         btnProfile = findViewById(R.id.btn_menu_profile);
         btnPersonalFM = findViewById(R.id.btn_menu_personal_fm);
-        TextView btnLogin = findViewById(R.id.btn_menu_login);
-        TextView btnSettings = findViewById(R.id.btn_menu_settings);
+        View btnLogin = findViewById(R.id.btn_menu_login);
+        View btnSettings = findViewById(R.id.btn_menu_settings);
 
         btnFavorites.setOnClickListener(v ->
                 startActivity(new Intent(this, FavoritesListActivity.class)));
