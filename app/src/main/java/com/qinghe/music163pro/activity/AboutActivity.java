@@ -48,7 +48,7 @@ public class AboutActivity extends AppCompatActivity {
 
         // Version
         content.addView(makeSpacer(px(4)));
-        String versionName = "20260404-fix1";
+        String versionName = "20260406";
         try {
             versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) {}
@@ -74,6 +74,25 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeText(
                 "适用于小天才手表的网易云音乐播放器。支持在线搜索、播放、下载、收藏、歌词显示、铃声设置等功能。"
                 + "支持扫码登录和Cookie登录，可播放VIP音乐。",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
+        // v20260406 update summary
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("v20260406 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText(
+                "• 全新 Material Design 2 暗色主题 UI 设计\n"
+                + "• 所有 emoji 图标替换为 Material 矢量图标（VectorDrawable）\n"
+                + "• 主题色改为紫色 #BB86FC，强调色改为青色 #03DAC6\n"
+                + "• 设置页布尔选项改为 Android 官方 SwitchMaterial 开关样式\n"
+                + "• 修复单曲循环图标、倍速选中颜色、译文按钮颜色\n"
+                + "• 音乐信息栏目标题改为矢量图标+文字\n"
+                + "• 我的歌单列表图标化，创建按钮改为主题色\n"
+                + "• 历史记录及歌单详情标题居中对齐",
                 0xFFAAAAAA, px(15), false, Gravity.START));
 
         // Divider

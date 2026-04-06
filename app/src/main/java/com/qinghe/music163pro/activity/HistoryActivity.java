@@ -52,20 +52,10 @@ public class HistoryActivity extends AppCompatActivity {
         root.setBackgroundColor(0xFF212121);
         root.setPadding(px(6), px(6), px(6), px(6));
 
-        // Title bar with clear button
-        LinearLayout titleBar = new LinearLayout(this);
-        titleBar.setOrientation(LinearLayout.HORIZONTAL);
-        titleBar.setGravity(Gravity.CENTER_VERTICAL);
+        // Title bar with clear button - use RelativeLayout for true centering
+        android.widget.RelativeLayout titleBar = new android.widget.RelativeLayout(this);
         titleBar.setPadding(0, 0, 0, px(6));
         root.addView(titleBar);
-
-        TextView title = new TextView(this);
-        title.setText("历史记录");
-        title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
-        title.setGravity(Gravity.CENTER);
-        title.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        titleBar.addView(title);
 
         TextView btnClear = new TextView(this);
         btnClear.setText("清空");
@@ -74,8 +64,27 @@ public class HistoryActivity extends AppCompatActivity {
         btnClear.setPadding(px(8), px(4), px(8), px(4));
         btnClear.setClickable(true);
         btnClear.setFocusable(true);
+        btnClear.setId(View.generateViewId());
         btnClear.setOnClickListener(v -> showClearConfirmDialog());
+        android.widget.RelativeLayout.LayoutParams clearParams = new android.widget.RelativeLayout.LayoutParams(
+                android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
+        clearParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
+        clearParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+        btnClear.setLayoutParams(clearParams);
         titleBar.addView(btnClear);
+
+        TextView title = new TextView(this);
+        title.setText("历史记录");
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
+        title.setGravity(Gravity.CENTER);
+        android.widget.RelativeLayout.LayoutParams titleParams = new android.widget.RelativeLayout.LayoutParams(
+                android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
+                android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
+        titleParams.addRule(android.widget.RelativeLayout.CENTER_IN_PARENT);
+        title.setLayoutParams(titleParams);
+        titleBar.addView(title);
 
         tvEmpty = new TextView(this);
         tvEmpty.setText("暂无播放记录");

@@ -10,6 +10,7 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -17,6 +18,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -72,16 +74,13 @@ public class MyPlaylistsActivity extends AppCompatActivity {
         titleRow.addView(tvTitle);
 
         // "+" button (top-right)
-        TextView btnCreate = new TextView(this);
-        btnCreate.setText("＋");
-        btnCreate.setTextColor(0xFFFF5252);
-        btnCreate.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(20));
-        btnCreate.setGravity(Gravity.CENTER);
-        btnCreate.setPadding(px(4), 0, px(4), 0);
+        ImageView btnCreate = new ImageView(this);
+        btnCreate.setImageResource(R.drawable.ic_add_box);
+        btnCreate.setColorFilter(0xFFBB86FC);
         btnCreate.setClickable(true);
         btnCreate.setFocusable(true);
         android.widget.RelativeLayout.LayoutParams btnParams = new android.widget.RelativeLayout.LayoutParams(
-                px(28), px(28));
+                px(24), px(24));
         btnParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
         btnParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         btnCreate.setLayoutParams(btnParams);
@@ -111,38 +110,43 @@ public class MyPlaylistsActivity extends AppCompatActivity {
         setContentView(root);
 
         adapter = new ArrayAdapter<PlaylistInfo>(this,
-                android.R.layout.simple_list_item_2, android.R.id.text1, displayList) {
+                R.layout.item_my_playlist, R.id.tv_name, displayList) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
-                View view = super.getView(position, convertView, parent);
+                View view = convertView;
+                if (view == null) {
+                    view = getLayoutInflater().inflate(R.layout.item_my_playlist, parent, false);
+                }
                 PlaylistInfo pl = getItem(position);
                 if (pl != null) {
-                    TextView text1 = view.findViewById(android.R.id.text1);
-                    TextView text2 = view.findViewById(android.R.id.text2);
-                    String prefix = "";
+                    ImageView icon = view.findViewById(R.id.iv_playlist_icon);
+                    TextView tvName = view.findViewById(R.id.tv_name);
+                    TextView tvDetail = view.findViewById(R.id.tv_detail);
+
+                    // Icon: liked playlist = favorite, created = music note, subscribed = queue_music
                     if (pl.isLikedPlaylist()) {
-                        prefix = "";
+                        icon.setImageResource(R.drawable.ic_favorite);
+                        icon.setColorFilter(0xFFFF4081);
                     } else if (pl.getUserId() == currentUserId) {
-                        prefix = "📝 ";
+                        icon.setImageResource(R.drawable.ic_music_note);
+                        icon.setColorFilter(0xFFBB86FC);
                     } else {
-                        prefix = "";
+                        icon.setImageResource(R.drawable.ic_queue_music);
+                        icon.setColorFilter(0x80FFFFFF);
                     }
-                    text1.setText(prefix + pl.getName());
-                    text1.setTextColor(0xFFFFFFFF);
-                    text1.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
-                    text1.setSingleLine(true);
-                    text1.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+                    tvName.setText(pl.getName());
+                    tvName.setTextColor(0xFFFFFFFF);
+                    tvName.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
 
                     String detail = pl.getTrackCount() + "首";
                     if (pl.getCreator() != null && !pl.getCreator().isEmpty()) {
                         detail += " · " + pl.getCreator();
                     }
-                    text2.setText(detail);
-                    text2.setTextColor(0xB3FFFFFF);
-                    text2.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
+                    tvDetail.setText(detail);
+                    tvDetail.setTextColor(0xB3FFFFFF);
+                    tvDetail.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
                 }
-                view.setBackgroundColor(0xFF2A2A2A);
-                view.setPadding(px(8), px(4), px(8), px(4));
                 return view;
             }
         };

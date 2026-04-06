@@ -4,7 +4,12 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- repeat arrows -->
     <path
         android:fillColor="@android:color/white"
-        android:pathData="M7,7h10v3l4,-4 -4,-4v3H5v6h2V7zm10,10H7v-3l-4,4 4,4v-3h12v-6h-2v5zM13,9v4.5l3.5,2 -0.75,1.23L12,14.5V9H13z"/>
+        android:pathData="M7,7h10v3l4,-4 -4,-4v3H5v6h2V7zm10,10H7v-3l-4,4 4,4v-3h12v-6h-2v5z"/>
+    <!-- "1" numeral centered -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M12.5,10h-1.2l-1.3,0.9v1.3l1.2,-0.85V15h1.3V10z"/>
 </vector>

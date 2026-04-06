@@ -608,7 +608,7 @@ public class CommentActivity extends AppCompatActivity {
     }
 
     private void updateLikeText(TextView tv, boolean liked, int count) {
-        String text = count > 0 ? (liked ? "\u25b2 " : "\u25b3 ") + count : (liked ? "\u25b2" : "\u25b3");
+        String text = count > 0 ? (liked ? "赞 " : "赞 ") + count : "赞";
         tv.setText(text);
         tv.setTextColor(liked ? COLOR_ACCENT : COLOR_TEXT_SECONDARY);
     }

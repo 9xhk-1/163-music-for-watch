@@ -9,6 +9,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -16,6 +17,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -96,7 +98,7 @@ public class SongInfoActivity extends AppCompatActivity {
         scrollView.addView(contentLayout);
 
         // Title
-        contentLayout.addView(makeText("\uD83C\uDFB5 音乐信息", COLOR_TEXT_PRIMARY, px(18), true, Gravity.CENTER));
+        contentLayout.addView(makeText("音乐信息", COLOR_TEXT_PRIMARY, px(18), true, Gravity.CENTER));
         contentLayout.addView(makeSpacer(px(8)));
 
         // Loading indicator
@@ -130,7 +132,7 @@ public class SongInfoActivity extends AppCompatActivity {
     }
 
     private void displayBasicInfo() {
-        addSectionHeader("基本信息");
+        addSectionHeader(R.drawable.ic_info, "基本信息");
         if (songName != null && !songName.isEmpty()) {
             addInfoRow("歌曲名", songName);
         }
@@ -141,7 +143,7 @@ public class SongInfoActivity extends AppCompatActivity {
     }
 
     private void displaySongDetail(JSONObject song) {
-        addSectionHeader("歌曲详情");
+        addSectionHeader(R.drawable.ic_music_note, "歌曲详情");
 
         // Song name
         String name = song.optString("name", "");
@@ -345,7 +347,7 @@ public class SongInfoActivity extends AppCompatActivity {
         contentLayout.addView(makeSpacer(px(6)));
         contentLayout.addView(makeDivider());
         contentLayout.addView(makeSpacer(px(6)));
-        addSectionHeader(blockTitle);
+        addSectionHeader(getBlockIconRes(blockCode), blockTitle);
 
         // Show block-level UI element if present
         JSONObject blockUiElement = block.optJSONObject("uiElement");
@@ -373,31 +375,50 @@ public class SongInfoActivity extends AppCompatActivity {
     private String getBlockTitle(String blockCode) {
         if (blockCode == null || blockCode.isEmpty()) return "其他信息";
         switch (blockCode) {
-            // Actual API codes (no _BLOCK suffix)
-            case "SONG_PLAY_ABOUT_SONG_BASIC": return "\uD83C\uDFB5 歌曲简介";
-            case "SONG_PLAY_ABOUT_SIMILAR_SONG": return "\uD83C\uDFB6 相似歌曲";
-            case "SONG_PLAY_ABOUT_RELATED_PLAYLIST": return "\uD83D\uDCCB 相关歌单";
-            case "SONG_PLAY_ABOUT_MUSIC_MEMORY": return "\uD83D\uDCCC 回忆坐标";
-            case "SONG_PLAY_ABOUT_MUSIC_SONG_GRADE": return "⭐ 歌曲评分";
-            case "SONG_PLAY_ABOUT_ARTIST": return "\uD83C\uDFA4 相关歌手";
-            case "SONG_PLAY_ABOUT_ALBUM": return "\uD83D\uDCBF 所属专辑";
-            case "SONG_PLAY_ABOUT_REC_SONG": return "\uD83D\uDD04 推荐歌曲";
-            case "SONG_PLAY_ABOUT_TOPIC": return "\uD83D\uDCAC 相关话题";
-            case "SONG_PLAY_ABOUT_SONG_WIKI": return "\uD83D\uDCD6 歌曲百科";
-            case "SONG_PLAY_ABOUT_RELATED_CREATION": return "✨ 相关创作";
-            // Legacy codes with _BLOCK suffix (keep for compatibility)
-            case "SONG_PLAY_ABOUT_SONG_BLOCK": return "\uD83C\uDFB5 歌曲简介";
-            case "SONG_PLAY_ABOUT_ARTIST_BLOCK": return "\uD83C\uDFA4 相关歌手";
-            case "SONG_PLAY_ABOUT_ALBUM_BLOCK": return "\uD83D\uDCBF 所属专辑";
-            case "SONG_PLAY_ABOUT_SIMILAR_SONG_BLOCK": return "\uD83C\uDFB6 相似歌曲";
-            case "SONG_PLAY_ABOUT_PLAYLIST_BLOCK": return "\uD83D\uDCCB 相关歌单";
-            case "SONG_PLAY_ABOUT_MEMORY_BLOCK": return "\uD83D\uDCCC 回忆坐标";
+            case "SONG_PLAY_ABOUT_SONG_BASIC":
+            case "SONG_PLAY_ABOUT_SONG_BLOCK":      return "歌曲简介";
+            case "SONG_PLAY_ABOUT_SIMILAR_SONG":
+            case "SONG_PLAY_ABOUT_SIMILAR_SONG_BLOCK": return "相似歌曲";
+            case "SONG_PLAY_ABOUT_RELATED_PLAYLIST":
+            case "SONG_PLAY_ABOUT_PLAYLIST_BLOCK":  return "相关歌单";
+            case "SONG_PLAY_ABOUT_MUSIC_MEMORY":
+            case "SONG_PLAY_ABOUT_MEMORY_BLOCK":    return "回忆坐标";
+            case "SONG_PLAY_ABOUT_MUSIC_SONG_GRADE": return "歌曲评分";
+            case "SONG_PLAY_ABOUT_ARTIST":
+            case "SONG_PLAY_ABOUT_ARTIST_BLOCK":    return "相关歌手";
+            case "SONG_PLAY_ABOUT_ALBUM":
+            case "SONG_PLAY_ABOUT_ALBUM_BLOCK":     return "所属专辑";
+            case "SONG_PLAY_ABOUT_REC_SONG":        return "推荐歌曲";
+            case "SONG_PLAY_ABOUT_TOPIC":           return "相关话题";
+            case "SONG_PLAY_ABOUT_SONG_WIKI":       return "歌曲百科";
+            case "SONG_PLAY_ABOUT_RELATED_CREATION": return "相关创作";
             default:
-                String cleaned = blockCode.replace("SONG_PLAY_ABOUT_", "")
+                return blockCode.replace("SONG_PLAY_ABOUT_", "")
                         .replace("_BLOCK", "")
                         .replace("_", " ");
-                return "\uD83D\uDCCB " + cleaned;
         }
+    }
+
+    private int getBlockIconRes(String blockCode) {
+        if (blockCode == null) return R.drawable.ic_info;
+        switch (blockCode) {
+            case "SONG_PLAY_ABOUT_SONG_BASIC":
+            case "SONG_PLAY_ABOUT_SONG_BLOCK":
+            case "SONG_PLAY_ABOUT_SONG_WIKI":       return R.drawable.ic_music_note;
+            case "SONG_PLAY_ABOUT_SIMILAR_SONG":
+            case "SONG_PLAY_ABOUT_SIMILAR_SONG_BLOCK":
+            case "SONG_PLAY_ABOUT_REC_SONG":        return R.drawable.ic_queue_music;
+            case "SONG_PLAY_ABOUT_RELATED_PLAYLIST":
+            case "SONG_PLAY_ABOUT_PLAYLIST_BLOCK":  return R.drawable.ic_bookmark;
+            case "SONG_PLAY_ABOUT_MUSIC_MEMORY":
+            case "SONG_PLAY_ABOUT_MEMORY_BLOCK":    return R.drawable.ic_pin;
+            case "SONG_PLAY_ABOUT_ARTIST":
+            case "SONG_PLAY_ABOUT_ARTIST_BLOCK":    return R.drawable.ic_mic;
+            case "SONG_PLAY_ABOUT_ALBUM":
+            case "SONG_PLAY_ABOUT_ALBUM_BLOCK":     return R.drawable.ic_album;
+            default:                                return R.drawable.ic_info;
+        }
+    }
     }
 
     private void displayCreative(JSONObject creative) {
@@ -779,7 +800,7 @@ public class SongInfoActivity extends AppCompatActivity {
         contentLayout.addView(makeSpacer(px(6)));
         contentLayout.addView(makeDivider());
         contentLayout.addView(makeSpacer(px(6)));
-        addSectionHeader("\uD83C\uDFA4 歌手百科");
+        addSectionHeader(R.drawable.ic_mic, "歌手百科");
 
         final TextView tvArtistLoading = makeText("加载歌手详情...", COLOR_TEXT_SECONDARY, px(13), false, Gravity.START);
         contentLayout.addView(tvArtistLoading);
@@ -870,7 +891,34 @@ public class SongInfoActivity extends AppCompatActivity {
     // ── UI helpers ──────────────────────────────────────────────────────
 
     private void addSectionHeader(String title) {
-        contentLayout.addView(makeText(title, COLOR_ACCENT, px(16), true, Gravity.START));
+        addSectionHeader(R.drawable.ic_info, title);
+    }
+
+    private void addSectionHeader(int iconRes, String title) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.setPadding(0, px(2), 0, 0);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(COLOR_ACCENT);
+        int iconSize = px(15);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        iconParams.setMarginEnd(px(5));
+        icon.setLayoutParams(iconParams);
+        row.addView(icon);
+
+        TextView tv = new TextView(this);
+        tv.setText(title);
+        tv.setTextColor(COLOR_ACCENT);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
+        tv.setTypeface(null, Typeface.BOLD);
+        row.addView(tv);
+
+        contentLayout.addView(row);
         contentLayout.addView(makeSpacer(px(4)));
     }
 

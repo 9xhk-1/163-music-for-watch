@@ -96,7 +96,7 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         tvTitle.setTextColor(0xFFFFFFFF);
         tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
         tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(px(28), 0, px(56), px(4));
+        tvTitle.setPadding(px(56), 0, px(56), px(4));
         tvTitle.setSingleLine(true);
         tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         android.widget.RelativeLayout.LayoutParams titleParams = new android.widget.RelativeLayout.LayoutParams(

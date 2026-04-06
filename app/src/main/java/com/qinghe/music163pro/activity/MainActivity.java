@@ -980,7 +980,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         translationEnabled = transPrefs.getBoolean("lyrics_translation", false);
         btnTranslationToggle = new TextView(this);
         btnTranslationToggle.setText(translationEnabled ? "译✓" : "译");
-        btnTranslationToggle.setTextColor(translationEnabled ? 0xFFFF5252 : 0xFF888888);
+        btnTranslationToggle.setTextColor(translationEnabled ? 0xFFBB86FC : 0x80FFFFFF);
         btnTranslationToggle.setTextSize(12);
         btnTranslationToggle.setGravity(Gravity.CENTER);
         btnTranslationToggle.setPadding(dp(6), dp(4), dp(6), dp(4));
@@ -1231,7 +1231,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Update button appearance
         if (btnTranslationToggle != null) {
             btnTranslationToggle.setText(translationEnabled ? "译✓" : "译");
-            btnTranslationToggle.setTextColor(translationEnabled ? 0xFFFF5252 : 0xFF888888);
+            btnTranslationToggle.setTextColor(translationEnabled ? 0xFFBB86FC : 0x80FFFFFF);
         }
         // Re-display lyrics with or without translation
         displayLyricsInOverlay();
@@ -1514,7 +1514,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             btn.setTextSize(14);
             btn.setGravity(Gravity.CENTER);
             btn.setPadding(0, dp(10), 0, dp(10));
-            btn.setBackgroundColor(Math.abs(currentSpeed - speed) < 0.01f ? 0xFFD32F2F : 0xFF424242);
+            btn.setBackgroundColor(Math.abs(currentSpeed - speed) < 0.01f ? 0xFFBB86FC : 0xFF2D2D2D);
             LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             btnParams.bottomMargin = dp(4);
