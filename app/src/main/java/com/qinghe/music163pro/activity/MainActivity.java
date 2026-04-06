@@ -1827,7 +1827,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         // Confirm button
         TextView btnConfirm = new TextView(this);
-        btnConfirm.setText("✓ 确认");
+        btnConfirm.setText("确认");
         btnConfirm.setTextColor(0xFFFFFFFF);
         btnConfirm.setTextSize(13);
         btnConfirm.setGravity(Gravity.CENTER);
