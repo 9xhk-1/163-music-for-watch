@@ -136,4 +136,4 @@ app/src/main/java/com/qinghe/music163pro/
 
 ## ℹ️ 注意
 
-本项目使用vibe coding辅助编写
+本项目使用vibe coding辅助编写<!-- Material Design 3 -->
