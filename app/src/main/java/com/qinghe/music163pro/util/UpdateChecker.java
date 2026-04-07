@@ -5,6 +5,7 @@ import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
@@ -14,6 +15,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Utility for checking app updates and downloading the latest APK.
@@ -29,10 +32,63 @@ public class UpdateChecker {
         void onError(String error);
     }
 
+    public interface SourcesCallback {
+        void onResult(List<String> urls);
+        void onError(String error);
+    }
+
     public interface DownloadCallback {
         void onProgress(int percent);
         void onComplete(String filePath);
         void onError(String error);
+    }
+
+    /**
+     * GET /source — returns list of download URLs.
+     * Response: {code:200, data:[url1,url2,...]}
+     * Calls callback on main thread.
+     */
+    public static void fetchSources(SourcesCallback callback) {
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                URL url = new URL(BASE_URL + "/source");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
+                conn.connect();
+
+                int code = conn.getResponseCode();
+                if (code == 200) {
+                    InputStream is = conn.getInputStream();
+                    StringBuilder sb = new StringBuilder();
+                    try {
+                        byte[] buf = new byte[1024];
+                        int n;
+                        while ((n = is.read(buf)) != -1) {
+                            sb.append(new String(buf, 0, n, Charset.forName("UTF-8")));
+                        }
+                    } finally {
+                        is.close();
+                    }
+                    JSONObject resp = new JSONObject(sb.toString());
+                    JSONArray arr = resp.getJSONArray("data");
+                    List<String> urls = new ArrayList<>();
+                    for (int i = 0; i < arr.length(); i++) {
+                        urls.add(arr.getString(i));
+                    }
+                    mainHandler.post(() -> callback.onResult(urls));
+                } else {
+                    mainHandler.post(() -> callback.onError("HTTP " + code));
+                }
+            } catch (Exception e) {
+                final String msg = e.getMessage();
+                mainHandler.post(() -> callback.onError(msg != null ? msg : "网络错误"));
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }).start();
     }
 
     /**
@@ -98,14 +154,14 @@ public class UpdateChecker {
     }
 
     /**
-     * GET /download — streams the APK to savePath.
+     * Downloads an APK from the given downloadUrl to savePath.
      * Progress and completion callbacks are posted to the main thread.
      */
-    public static void downloadUpdate(String savePath, DownloadCallback callback) {
+    public static void downloadUpdate(String downloadUrl, String savePath, DownloadCallback callback) {
         new Thread(() -> {
             HttpURLConnection conn = null;
             try {
-                URL url = new URL(BASE_URL + "/download");
+                URL url = new URL(downloadUrl);
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(30000);
