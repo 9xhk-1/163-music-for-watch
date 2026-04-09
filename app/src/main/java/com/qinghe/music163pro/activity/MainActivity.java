@@ -692,7 +692,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         boolean hasVolumeInfo = max > 0;
         int percent = hasVolumeInfo ? Math.round(current * 100f / max) : 0;
         int availableWidth = Math.max(
-                getResources().getDisplayMetrics().widthPixels - dp(VOLUME_INDICATOR_SIDE_MARGIN_DP),
+                getResources().getDisplayMetrics().widthPixels - dp(VOLUME_INDICATOR_SIDE_MARGIN_DP * 2),
                 dp(VOLUME_INDICATOR_MIN_WIDTH_DP));
         int popupWidth = availableWidth > dp(VOLUME_INDICATOR_COMPACT_BREAKPOINT_DP)
                 ? Math.min(availableWidth, dp(VOLUME_INDICATOR_MAX_WIDTH_DP))
@@ -721,7 +721,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         FrameLayout.LayoutParams iconParams = new FrameLayout.LayoutParams(dp(18), dp(18));
         iconParams.gravity = Gravity.CENTER;
         iconView.setLayoutParams(iconParams);
-        iconView.setImageResource(current == 0 ? R.drawable.ic_volume_down : R.drawable.ic_volume_up);
+        iconView.setImageResource(current == 0 ? R.drawable.ic_volume_off : R.drawable.ic_volume_up);
         iconView.setColorFilter(ContextCompat.getColor(this, R.color.colorPrimary));
         iconWrap.addView(iconView);
 
