@@ -25,6 +25,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -682,8 +683,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
 
         int percent = max > 0 ? Math.round(current * 100f / max) : 0;
-        int availableWidth = getResources().getDisplayMetrics().widthPixels - dp(24);
-        int popupWidth = Math.max(dp(132), Math.min(availableWidth, dp(176)));
+        int availableWidth = Math.max(getResources().getDisplayMetrics().widthPixels - dp(24), dp(96));
+        int popupWidth = availableWidth > dp(132) ? Math.min(availableWidth, dp(176)) : availableWidth;
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
