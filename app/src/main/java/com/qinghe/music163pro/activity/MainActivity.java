@@ -55,6 +55,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final String HEART_OUTLINE = "\u2661";
     private static final String HEART_FILLED = "\u2665";
     private static final int STORAGE_PERMISSION_REQUEST = 100;
+    private static final int VOLUME_INDICATOR_SIDE_MARGIN_DP = 24;
+    private static final int VOLUME_INDICATOR_MIN_WIDTH_DP = 96;
+    private static final int VOLUME_INDICATOR_COMPACT_BREAKPOINT_DP = 132;
+    private static final int VOLUME_INDICATOR_MAX_WIDTH_DP = 176;
+    private static final int VOLUME_INDICATOR_TOP_MARGIN_DP = 10;
+    private static final int VOLUME_INDICATOR_ANIM_DURATION_MS = 160;
+    private static final float VOLUME_INDICATOR_INITIAL_SCALE = 0.96f;
 
     private TextView tvSongName;
     private TextView tvArtist;
@@ -684,8 +691,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         boolean hasVolumeInfo = max > 0;
         int percent = hasVolumeInfo ? Math.round(current * 100f / max) : 0;
-        int availableWidth = Math.max(getResources().getDisplayMetrics().widthPixels - dp(24), dp(96));
-        int popupWidth = availableWidth > dp(132) ? Math.min(availableWidth, dp(176)) : availableWidth;
+        int availableWidth = Math.max(
+                getResources().getDisplayMetrics().widthPixels - dp(VOLUME_INDICATOR_SIDE_MARGIN_DP),
+                dp(VOLUME_INDICATOR_MIN_WIDTH_DP));
+        int popupWidth = availableWidth > dp(VOLUME_INDICATOR_COMPACT_BREAKPOINT_DP)
+                ? Math.min(availableWidth, dp(VOLUME_INDICATOR_MAX_WIDTH_DP))
+                : availableWidth;
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
@@ -762,14 +773,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 popupWidth, FrameLayout.LayoutParams.WRAP_CONTENT);
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        params.topMargin = dp(10);
+        params.topMargin = dp(VOLUME_INDICATOR_TOP_MARGIN_DP);
         volumeIndicator.setLayoutParams(params);
 
         rootView.addView(volumeIndicator);
         volumeIndicator.setAlpha(0f);
-        volumeIndicator.setScaleX(0.96f);
-        volumeIndicator.setScaleY(0.96f);
-        volumeIndicator.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160).start();
+        volumeIndicator.setScaleX(VOLUME_INDICATOR_INITIAL_SCALE);
+        volumeIndicator.setScaleY(VOLUME_INDICATOR_INITIAL_SCALE);
+        volumeIndicator.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                .setDuration(VOLUME_INDICATOR_ANIM_DURATION_MS)
+                .start();
 
         // Auto-dismiss after 1.5 seconds
         volumeHandler.removeCallbacksAndMessages(null);
