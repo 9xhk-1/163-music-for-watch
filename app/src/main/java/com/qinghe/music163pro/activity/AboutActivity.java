@@ -48,7 +48,7 @@ public class AboutActivity extends AppCompatActivity {
 
         // Version
         content.addView(makeSpacer(px(4)));
-        String versionName = "20260406";
+        String versionName = "20260709";
         try {
             versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) {}
@@ -74,6 +74,20 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeText(
                 "适用于小天才手表的网易云音乐播放器。支持在线搜索、播放、下载、收藏、歌词显示、铃声设置等功能。"
                 + "支持扫码登录和Cookie登录，可播放VIP音乐。",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
+        // v20260709 update summary
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("v20260709 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText(
+                "• 重做音量提示弹窗，采用更紧凑的卡片式显示，适配手表 320×360 界面\n"
+                + "• 优化音量弹窗的间距、图标与进度条展示效果\n"
+                + "• 修复音量弹窗引入后导致的 release 版本无法编译问题",
                 0xFFAAAAAA, px(15), false, Gravity.START));
 
         // Divider
