@@ -85,9 +85,7 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeText("v20260709 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
         content.addView(makeSpacer(px(4)));
         content.addView(makeText(
-                "• 重做音量提示弹窗，采用更紧凑的卡片式显示，适配手表 320×360 界面\n"
-                + "• 优化音量弹窗的间距、图标与进度条展示效果\n"
-                + "• 修复音量弹窗引入后导致的 release 版本无法编译问题",
+                "• 重做音量提示弹窗，采用卡片式显示",
                 0xFFAAAAAA, px(15), false, Gravity.START));
 
         // Divider
