@@ -1729,7 +1729,7 @@ const AudioFingerprintRuntime = () => {
 
 // XXX: With PythonMonkey, the required module
 // is destructed(?) once the function is called
-// This is probably not what actaully happened, but
+// This is probably not what actually happened, but
 // for now, everytime an FP is generated, the entire
 // WASM module is reloaded as a workaround
 function instantiateRuntime() {

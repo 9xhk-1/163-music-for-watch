@@ -54,6 +54,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
     private static final int MANUAL_MAX_SECONDS = 10;
     private static final int AUTO_CHUNK_SECONDS = 3;
     private static final int AUTO_CHUNK_BYTES = BYTES_PER_SECOND * AUTO_CHUNK_SECONDS;
+    private static final String MESSAGE_RECORD_TOO_SHORT = "录音不能小于三秒";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Object audioLock = new Object();
@@ -243,8 +244,8 @@ public class SongRecognitionActivity extends AppCompatActivity {
         if (recordedSeconds < MIN_SECONDS) {
             runOnUiThread(() -> {
                 if (sessionId != activeSessionId) return;
-                finishRecognitionUi(true, false, "录音不能小于三秒", false);
-                Toast.makeText(this, "录音不能小于三秒", Toast.LENGTH_SHORT).show();
+                finishRecognitionUi(true, false, MESSAGE_RECORD_TOO_SHORT, false);
+                Toast.makeText(this, MESSAGE_RECORD_TOO_SHORT, Toast.LENGTH_SHORT).show();
             });
             return;
         }
@@ -282,8 +283,8 @@ public class SongRecognitionActivity extends AppCompatActivity {
             }
             int recordedSeconds = calculateRecordedSeconds(totalBytes[0]);
             if (recordedSeconds < MIN_SECONDS) {
-                finishRecognitionUi(true, false, "录音不能小于三秒", false);
-                Toast.makeText(this, "录音不能小于三秒", Toast.LENGTH_SHORT).show();
+                finishRecognitionUi(true, false, MESSAGE_RECORD_TOO_SHORT, false);
+                Toast.makeText(this, MESSAGE_RECORD_TOO_SHORT, Toast.LENGTH_SHORT).show();
             } else {
                 finishRecognitionUi(true, false, "已停止自动识别", false);
             }
@@ -319,6 +320,9 @@ public class SongRecognitionActivity extends AppCompatActivity {
                     audioRecord = null;
                     return null;
                 }
+                // These effects are optional on Android watches, but when available
+                // they further reduce echo/noise so the recorder is less likely to
+                // pick up the watch speaker output during recognition.
                 enableAudioEffects(audioRecord.getAudioSessionId());
                 audioRecord.startRecording();
             }
