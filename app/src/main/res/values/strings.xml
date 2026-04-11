@@ -35,4 +35,5 @@
     <string name="no_mv">暂无MV</string>
     <string name="mv_cover">MV封面</string>
     <string name="play_mv">播放MV</string>
+    <string name="tap_to_view_detail">点击查看详情</string>
 </resources>

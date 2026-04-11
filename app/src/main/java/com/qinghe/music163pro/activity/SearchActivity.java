@@ -158,7 +158,7 @@ public class SearchActivity extends BaseWatchActivity {
                         }
                         info.append(formatDuration(mvInfo.getDurationMs()));
                     }
-                    tvInfo.setText(info.length() > 0 ? info.toString() : "点击查看详情");
+                    tvInfo.setText(info.length() > 0 ? info.toString() : getString(R.string.tap_to_view_detail));
                 }
                 return view;
             }

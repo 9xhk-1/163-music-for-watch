@@ -462,7 +462,7 @@ public class MusicApiHelper {
                 MusicLog.op(TAG, "获取MV播放地址", "mvId=" + mvId);
                 JSONObject data = new JSONObject();
                 data.put("id", mvId);
-                data.put("r", 1080);
+                data.put("r", 480);
                 String csrfToken = extractCsrfToken(cookie);
                 data.put("csrf_token", csrfToken);
 
