@@ -42,7 +42,7 @@ public class OpenSourceActivity extends AppCompatActivity {
                 0xFFAAAAAA, px(15), false, Gravity.START));
         addProject(content,
                 "163MusicPro",
-                "开发者：Qinghe（MIT License）",
+                "开发者：Qinghe",
                 "https://github.com/9xhk-1/163MusicPro");
         addProject(content,
                 "Material Components for Android",
