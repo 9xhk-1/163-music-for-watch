@@ -37,6 +37,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
@@ -777,7 +778,12 @@ public class CommentActivity extends BaseWatchActivity {
         if (hours < 24) return hours + "小时前";
         if (days < 7) return days + "天前";
 
-        SimpleDateFormat sdf = new SimpleDateFormat("MM-dd", Locale.getDefault());
+        Calendar nowCalendar = Calendar.getInstance();
+        Calendar targetCalendar = Calendar.getInstance();
+        targetCalendar.setTimeInMillis(timestamp);
+        String pattern = nowCalendar.get(Calendar.YEAR) == targetCalendar.get(Calendar.YEAR)
+                ? "MM-dd" : "yyyy-MM-dd";
+        SimpleDateFormat sdf = new SimpleDateFormat(pattern, Locale.getDefault());
         return sdf.format(new Date(timestamp));
     }
 

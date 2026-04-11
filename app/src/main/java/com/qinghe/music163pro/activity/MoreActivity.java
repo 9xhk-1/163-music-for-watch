@@ -22,7 +22,7 @@ import java.util.List;
 /**
  * More menu activity - shows a flat tile list of functions:
  * 收藏列表, 搜索, 下载列表, 铃声管理, 排行榜, 历史记录,
- * 个人中心(登录后), 私人漫游(登录后), 登录, 设置
+ * 个人中心(登录后), 私人漫游, 登录, 设置
  *
  * Supports right-swipe gesture to go back to the player screen.
  */
@@ -125,7 +125,7 @@ public class MoreActivity extends AppCompatActivity {
         String cookie = MusicPlayerManager.getInstance().getCookie();
         boolean loggedIn = cookie != null && !cookie.isEmpty() && cookie.contains("MUSIC_U");
         btnProfile.setVisibility(loggedIn ? View.VISIBLE : View.GONE);
-        btnPersonalFM.setVisibility(loggedIn ? View.VISIBLE : View.GONE);
+        btnPersonalFM.setVisibility(View.VISIBLE);
         btnMyPlaylists.setVisibility(loggedIn ? View.VISIBLE : View.GONE);
     }
 

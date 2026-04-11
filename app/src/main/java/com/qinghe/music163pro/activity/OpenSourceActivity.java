@@ -34,8 +34,16 @@ public class OpenSourceActivity extends AppCompatActivity {
         content.addView(makeText("开源", 0xFFFFFFFF, px(22), true, Gravity.CENTER));
         content.addView(makeSpacer(px(8)));
         content.addView(makeText(
-                "以下为本项目使用到的开源项目、开发者和 GitHub 链接。",
+                "本仓库采用 MIT License 开源，以下为本项目和使用到的开源项目说明。",
                 0xFFAAAAAA, px(15), false, Gravity.START));
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText(
+                "163MusicPro 代码部分可在 MIT 协议下使用、修改和分发；网易云音乐相关 API 与内容版权仍归网易公司所有。",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+        addProject(content,
+                "163MusicPro",
+                "开发者：Qinghe",
+                "https://github.com/9xhk-1/163MusicPro");
         addProject(content,
                 "Material Components for Android",
                 "开发者：Google",

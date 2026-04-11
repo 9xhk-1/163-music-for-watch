@@ -656,11 +656,6 @@ public class MusicPlayerManager {
     private void loadMorePersonalFmAndAdvance() {
         if (personalFmLoading) return;
         String cookie = getCookie();
-        if (cookie == null || cookie.isEmpty()) {
-            currentIndex = (currentIndex + 1) % playlist.size();
-            playCurrent();
-            return;
-        }
         personalFmLoading = true;
         MusicApiHelper.getPersonalFM(cookie, new MusicApiHelper.PersonalFMCallback() {
             @Override
