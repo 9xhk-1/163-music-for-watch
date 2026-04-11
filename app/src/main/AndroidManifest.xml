@@ -55,6 +55,8 @@
         <activity android:name=".activity.PlaylistDetailActivity" android:exported="false" />
         <activity android:name=".activity.MyPlaylistsActivity" android:exported="false" />
         <activity android:name=".activity.UpdateActivity" android:exported="false" />
+        <activity android:name=".activity.MvDetailActivity" android:exported="false" />
+        <activity android:name=".activity.MvPlayerActivity" android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">163音乐Pro</string>
-    <string name="search_hint">搜索歌曲</string>
+    <string name="search_hint">搜索歌曲 / 歌单 / MV</string>
     <string name="search">搜索</string>
     <string name="favorites">收藏</string>
     <string name="settings">设置</string>
@@ -31,4 +31,8 @@
     <string name="fav_mode_local">收藏模式: 本地</string>
     <string name="fav_mode_cloud">收藏模式: 云端</string>
     <string name="ringtone_manager">铃声管理</string>
+    <string name="search_mv">MV</string>
+    <string name="no_mv">暂无MV</string>
+    <string name="mv_cover">MV封面</string>
+    <string name="play_mv">播放MV</string>
 </resources>

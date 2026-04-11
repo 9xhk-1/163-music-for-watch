@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/player_view_mv"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:show_buffering="always"
+        app:use_controller="true" />
+
+    <TextView
+        android:id="@+id/tv_mv_player_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="@color/surface_overlay"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:padding="8dp"
+        android:textColor="@color/text_primary"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/tv_mv_player_loading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@color/surface_overlay"
+        android:paddingStart="12dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp"
+        android:text="正在加载视频..."
+        android:textColor="@color/text_primary"
+        android:textSize="12sp" />
+</FrameLayout>

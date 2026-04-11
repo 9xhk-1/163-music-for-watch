@@ -1,12 +1,13 @@
 package com.qinghe.music163pro.api;
 
-import com.qinghe.music163pro.model.PlaylistInfo;
-import com.qinghe.music163pro.model.Song;
-import com.qinghe.music163pro.util.MusicLog;
-
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+
+import com.qinghe.music163pro.model.MvInfo;
+import com.qinghe.music163pro.model.PlaylistInfo;
+import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.util.MusicLog;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -206,6 +207,16 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface SearchMvCallback {
+        void onResult(List<MvInfo> mvs);
+        void onError(String message);
+    }
+
+    public interface MvDetailCallback {
+        void onResult(JSONObject mvDetail);
+        void onError(String message);
+    }
+
     public interface UserPlaylistsCallback {
         void onResult(List<PlaylistInfo> playlists);
         void onError(String message);
@@ -351,6 +362,121 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onResult(playlists));
             } catch (Exception e) {
                 MusicLog.w(TAG, "搜索歌单失败: " + keyword, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    // ==================== Search MVs ====================
+
+    /**
+     * Search MVs via cloudsearch (type=1004).
+     * Supports pagination with offset.
+     */
+    public static void searchMvs(String keyword, int offset, String cookie, SearchMvCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "搜索MV", "keyword=" + keyword + " offset=" + offset);
+                JSONObject data = new JSONObject();
+                data.put("s", keyword);
+                data.put("type", 1004);
+                data.put("limit", 20);
+                data.put("offset", offset);
+                data.put("total", true);
+
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/cloudsearch/pc", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                List<MvInfo> mvs = new ArrayList<>();
+                JSONObject result = json.optJSONObject("result");
+                if (result != null) {
+                    JSONArray mvsArray = result.optJSONArray("mvs");
+                    if (mvsArray == null) {
+                        mvsArray = result.optJSONArray("mvps");
+                    }
+                    if (mvsArray != null) {
+                        for (int i = 0; i < mvsArray.length(); i++) {
+                            JSONObject mv = mvsArray.optJSONObject(i);
+                            if (mv == null) {
+                                continue;
+                            }
+                            long id = mv.optLong("id", mv.optLong("mvid", 0));
+                            String name = mv.optString("name", "");
+                            String artist = mv.optString("artistName", "");
+                            if (artist.isEmpty()) {
+                                artist = joinArtistNames(mv.optJSONArray("artists"));
+                            }
+                            String coverUrl = pickFirstNonEmpty(mv, "cover", "coverUrl", "imgurl16v9", "picUrl");
+                            long duration = mv.optLong("duration", mv.optLong("durationms", 0));
+                            long playCount = mv.optLong("playCount", 0);
+                            mvs.add(new MvInfo(id, name, artist, coverUrl, duration, playCount));
+                        }
+                    }
+                }
+                MusicLog.d(TAG, "搜索MV结果: " + mvs.size() + " 个");
+                mainHandler.post(() -> callback.onResult(mvs));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "搜索MV失败: " + keyword, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /**
+     * Get MV detail by MV ID.
+     * Endpoint: /api/v1/mv/detail
+     */
+    public static void getMvDetail(long mvId, String cookie, MvDetailCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "获取MV详情", "mvId=" + mvId);
+                JSONObject data = new JSONObject();
+                data.put("id", mvId);
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/v1/mv/detail", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONObject detail = json.optJSONObject("data");
+                if (detail == null) {
+                    mainHandler.post(() -> callback.onError("获取MV详情失败"));
+                    return;
+                }
+                mainHandler.post(() -> callback.onResult(detail));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取MV详情失败: " + mvId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /**
+     * Get MV playback URL by MV ID.
+     * Endpoint: /api/song/enhance/play/mv/url
+     */
+    public static void getMvUrl(long mvId, String cookie, UrlCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "获取MV播放地址", "mvId=" + mvId);
+                JSONObject data = new JSONObject();
+                data.put("id", mvId);
+                data.put("r", 1080);
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/song/enhance/play/mv/url", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONObject mvData = json.optJSONObject("data");
+                String url = mvData != null ? mvData.optString("url", "") : "";
+                if (url == null || url.isEmpty()) {
+                    mainHandler.post(() -> callback.onError("未获取到MV地址"));
+                    return;
+                }
+                mainHandler.post(() -> callback.onResult(url));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取MV播放地址失败: " + mvId, e);
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
@@ -2080,6 +2206,41 @@ public class MusicApiHelper {
             String trimmed = part.trim();
             if (trimmed.startsWith("__csrf=")) {
                 return trimmed.substring("__csrf=".length());
+            }
+        }
+        return "";
+    }
+
+    private static String joinArtistNames(JSONArray artists) {
+        if (artists == null || artists.length() == 0) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < artists.length(); i++) {
+            JSONObject artist = artists.optJSONObject(i);
+            if (artist == null) {
+                continue;
+            }
+            String name = artist.optString("name", "");
+            if (name.isEmpty()) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(" / ");
+            }
+            builder.append(name);
+        }
+        return builder.toString();
+    }
+
+    private static String pickFirstNonEmpty(JSONObject jsonObject, String... keys) {
+        if (jsonObject == null || keys == null) {
+            return "";
+        }
+        for (String key : keys) {
+            String value = jsonObject.optString(key, "");
+            if (value != null && !value.isEmpty()) {
+                return value;
             }
         }
         return "";
