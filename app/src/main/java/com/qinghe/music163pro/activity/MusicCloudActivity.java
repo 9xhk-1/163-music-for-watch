@@ -1,12 +1,8 @@
 package com.qinghe.music163pro.activity;
 
-import android.app.AlertDialog;
 import android.content.Intent;
-import android.database.Cursor;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.provider.OpenableColumns;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
@@ -35,29 +31,19 @@ import java.util.List;
  */
 public class MusicCloudActivity extends BaseWatchActivity {
 
-    private static final int REQUEST_PICK_UPLOAD = 2001;
-
     private final List<CloudItem> musicItems = new ArrayList<>();
-    private final List<CloudItem> fileItems = new ArrayList<>();
     private final List<CloudItem> displayItems = new ArrayList<>();
 
     private ArrayAdapter<CloudItem> adapter;
     private TextView tvStatus;
-    private TextView tabMusic;
-    private TextView tabFiles;
-    private boolean showingMusicTab = true;
-    private boolean uploadAsMusic = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_music_cloud);
 
-        tabMusic = findViewById(R.id.tab_music);
-        tabFiles = findViewById(R.id.tab_files);
         tvStatus = findViewById(R.id.tv_cloud_status);
         ListView listView = findViewById(R.id.lv_cloud_items);
-        View btnAdd = findViewById(R.id.btn_add_cloud);
 
         adapter = new ArrayAdapter<CloudItem>(this, R.layout.item_cloud_entry, R.id.tv_cloud_name, displayItems) {
             @Override
@@ -81,9 +67,6 @@ public class MusicCloudActivity extends BaseWatchActivity {
         };
         listView.setAdapter(adapter);
 
-        tabMusic.setOnClickListener(v -> switchTab(true));
-        tabFiles.setOnClickListener(v -> switchTab(false));
-        btnAdd.setOnClickListener(v -> showUploadTypeDialog());
         listView.setOnItemClickListener((parent, view, position, id) -> onCloudItemClick(displayItems.get(position)));
         listView.setOnItemLongClickListener((parent, view, position, id) -> {
             CloudItem item = displayItems.get(position);
@@ -91,7 +74,7 @@ public class MusicCloudActivity extends BaseWatchActivity {
             return true;
         });
 
-        switchTab(true);
+        applyMusicItems();
     }
 
     @Override
@@ -113,15 +96,12 @@ public class MusicCloudActivity extends BaseWatchActivity {
             @Override
             public void onResult(List<CloudItem> items) {
                 musicItems.clear();
-                fileItems.clear();
                 for (CloudItem item : items) {
                     if (item.isMusic()) {
                         musicItems.add(item);
-                    } else {
-                        fileItems.add(item);
                     }
                 }
-                applyCurrentTab();
+                applyMusicItems();
             }
 
             @Override
@@ -131,23 +111,14 @@ public class MusicCloudActivity extends BaseWatchActivity {
         });
     }
 
-    private void switchTab(boolean music) {
-        showingMusicTab = music;
-        tabMusic.setTextColor(getResources().getColor(music ? R.color.text_primary : R.color.text_secondary));
-        tabMusic.setBackgroundColor(music ? 0x332196F3 : 0x00000000);
-        tabFiles.setTextColor(getResources().getColor(music ? R.color.text_secondary : R.color.text_primary));
-        tabFiles.setBackgroundColor(music ? 0x00000000 : 0x332196F3);
-        applyCurrentTab();
-    }
-
-    private void applyCurrentTab() {
+    private void applyMusicItems() {
         displayItems.clear();
-        displayItems.addAll(showingMusicTab ? musicItems : fileItems);
+        displayItems.addAll(musicItems);
         adapter.notifyDataSetChanged();
         if (displayItems.isEmpty()) {
-            tvStatus.setText(showingMusicTab ? "暂无云盘音乐" : "暂无云盘文件");
+            tvStatus.setText("暂无云盘音乐");
         } else {
-            tvStatus.setText(displayItems.size() + (showingMusicTab ? " 首音乐" : " 个文件"));
+            tvStatus.setText(displayItems.size() + " 首音乐");
         }
     }
 
@@ -255,8 +226,7 @@ public class MusicCloudActivity extends BaseWatchActivity {
             public void onResult(boolean success) {
                 if (success) {
                     musicItems.remove(item);
-                    fileItems.remove(item);
-                    applyCurrentTab();
+                    applyMusicItems();
                     Toast.makeText(MusicCloudActivity.this, "已删除", Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(MusicCloudActivity.this, "删除失败", Toast.LENGTH_SHORT).show();
@@ -268,59 +238,6 @@ public class MusicCloudActivity extends BaseWatchActivity {
                 Toast.makeText(MusicCloudActivity.this, "删除失败: " + message, Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    private void showUploadTypeDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("上传到云盘")
-                .setItems(new String[]{"音乐", "文件"}, (dialog, which) -> {
-                    uploadAsMusic = which == 0;
-                    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                    intent.setType("*/*");
-                    intent.addCategory(Intent.CATEGORY_OPENABLE);
-                    startActivityForResult(Intent.createChooser(intent, "选择文件"), REQUEST_PICK_UPLOAD);
-                })
-                .setNegativeButton("取消", null)
-                .show();
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQUEST_PICK_UPLOAD || resultCode != RESULT_OK || data == null) {
-            return;
-        }
-        Uri uri = data.getData();
-        if (uri == null) {
-            Toast.makeText(this, "未选择文件", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Intent intent = new Intent(this, CloudUploadProgressActivity.class);
-        intent.setData(uri);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        intent.putExtra("upload_name", queryDisplayName(uri));
-        intent.putExtra("upload_is_music", uploadAsMusic);
-        startActivity(intent);
-    }
-
-    private String queryDisplayName(Uri uri) {
-        Cursor cursor = null;
-        try {
-            cursor = getContentResolver().query(uri, null, null, null, null);
-            if (cursor != null && cursor.moveToFirst()) {
-                int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-                if (index >= 0) {
-                    return cursor.getString(index);
-                }
-            }
-        } catch (Exception ignored) {
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-        String last = uri.getLastPathSegment();
-        return last != null ? last : "upload.bin";
     }
 
     private String sanitizeFileName(String fileName) {
