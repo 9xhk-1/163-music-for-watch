@@ -1752,8 +1752,8 @@ public class MusicApiHelper {
                 checkData.put("md5", md5);
                 checkData.put("songId", "0");
                 checkData.put("version", 1);
-                String checkResponse = eapiPost("/api/cloud/upload/check", checkData.toString(), cookie);
-                JSONObject checkJson = new JSONObject(checkResponse);
+                String uploadCheckResponse = eapiPost("/api/cloud/upload/check", checkData.toString(), cookie);
+                JSONObject checkJson = new JSONObject(uploadCheckResponse);
                 if (checkJson.optInt("code", -1) != 200) {
                     mainHandler.post(() -> callback.onError(checkJson.optString("message", "上传校验失败")));
                     return;
@@ -1768,8 +1768,8 @@ public class MusicApiHelper {
                 tokenData.put("nos_product", 3);
                 tokenData.put("type", "audio");
                 tokenData.put("md5", md5);
-                String tokenResponse = weapiPost("/api/nos/token/alloc", tokenData.toString(), cookie);
-                JSONObject tokenJson = new JSONObject(tokenResponse);
+                String uploadTokenResponse = weapiPost("/api/nos/token/alloc", tokenData.toString(), cookie);
+                JSONObject tokenJson = new JSONObject(uploadTokenResponse);
                 JSONObject tokenResult = tokenJson.optJSONObject("result");
                 if (tokenResult == null) {
                     mainHandler.post(() -> callback.onError("上传凭证获取失败"));
