@@ -90,9 +90,16 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
         MusicApiHelper.getSongDetail(songId, cookie, new MusicApiHelper.SongDetailCallback() {
             @Override
             public void onResult(JSONObject songJson) {
+                if (isActivityUnavailable()) {
+                    return;
+                }
+                if (songJson == null) {
+                    showError("服务器返回数据为空，无法播放", sourceIntent);
+                    return;
+                }
                 Song song = parseSong(songJson);
                 if (song == null) {
-                    showError("歌曲详情为空，无法播放", sourceIntent);
+                    showError("歌曲信息解析失败，无法播放", sourceIntent);
                     return;
                 }
 
@@ -103,12 +110,18 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
 
             @Override
             public void onError(String error) {
+                if (isActivityUnavailable()) {
+                    return;
+                }
                 showError("获取歌曲信息失败: " + error, sourceIntent);
             }
         });
     }
 
     private void openMainActivity() {
+        if (isActivityUnavailable()) {
+            return;
+        }
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
@@ -121,12 +134,19 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
     }
 
     private void showError(String message, Intent intent) {
+        if (isActivityUnavailable()) {
+            return;
+        }
         String intentDump = dumpIntent(intent);
         Log.e(TAG, message + "\n" + intentDump);
         tvStatus.setText("分享链接打开失败");
         errorContainer.setVisibility(View.VISIBLE);
         tvErrorMessage.setText(message);
         tvIntentDump.setText(intentDump);
+    }
+
+    private boolean isActivityUnavailable() {
+        return isFinishing() || isDestroyed();
     }
 
     private String getShareTypeValue(Intent intent) {
