@@ -12,6 +12,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
+import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -98,6 +99,12 @@ public class LyricsActivity extends AppCompatActivity {
             return;
         }
 
+        // Handle Bilibili songs - fetch subtitle from Bilibili API
+        if (song.isBilibili()) {
+            loadBilibiliSubtitle(song);
+            return;
+        }
+
         // Fetch from API
         if (song.getId() <= 0) {
             showNoLyrics();
@@ -122,6 +129,59 @@ public class LyricsActivity extends AppCompatActivity {
                 showNoLyrics();
             }
         });
+    }
+
+    /**
+     * Load subtitle for a Bilibili video.
+     * First fetches subtitle list, then downloads the first available subtitle.
+     */
+    private void loadBilibiliSubtitle(Song song) {
+        String bilibiliCookie = getSharedPreferences("music163_settings", MODE_PRIVATE)
+                .getString("bilibili_cookie", "");
+
+        BilibiliApiHelper.getSubtitleList(song.getBvid(), song.getCid(), bilibiliCookie,
+                new BilibiliApiHelper.SubtitleListCallback() {
+                    @Override
+                    public void onResult(List<BilibiliApiHelper.SubtitleInfo> subtitles) {
+                        if (subtitles.isEmpty()) {
+                            showNoLyrics();
+                            return;
+                        }
+
+                        // Pick first subtitle (prefer Chinese)
+                        BilibiliApiHelper.SubtitleInfo chosen = subtitles.get(0);
+                        for (BilibiliApiHelper.SubtitleInfo info : subtitles) {
+                            if (info.lan.startsWith("zh")) {
+                                chosen = info;
+                                break;
+                            }
+                        }
+
+                        BilibiliApiHelper.getSubtitle(chosen.subtitleUrl,
+                                new BilibiliApiHelper.SubtitleCallback() {
+                                    @Override
+                                    public void onResult(String lrcText) {
+                                        if (lrcText == null || lrcText.isEmpty()) {
+                                            showNoLyrics();
+                                            return;
+                                        }
+                                        parseLrc(lrcText);
+                                        displayLyrics();
+                                        startScrollSync();
+                                    }
+
+                                    @Override
+                                    public void onError(String message) {
+                                        showNoLyrics();
+                                    }
+                                });
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        showNoLyrics();
+                    }
+                });
     }
 
     /**

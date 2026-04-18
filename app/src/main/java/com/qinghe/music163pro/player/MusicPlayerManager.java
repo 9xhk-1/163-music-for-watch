@@ -11,6 +11,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
+import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
 
@@ -425,6 +426,12 @@ public class MusicPlayerManager {
             return;
         }
 
+        // Handle Bilibili songs
+        if (song.isBilibili()) {
+            playBilibiliSong(song);
+            return;
+        }
+
         // Always fetch a fresh URL to avoid expired URL issues.
         // NetEase song URLs are time-limited, so cached URLs may not work.
         String cookie = getCookie();
@@ -447,6 +454,95 @@ public class MusicPlayerManager {
                 }
             }
         });
+    }
+
+    /**
+     * Play a Bilibili song by fetching the audio stream URL.
+     * Bilibili audio URLs are time-limited, so always fetch fresh.
+     */
+    private void playBilibiliSong(Song song) {
+        // If we have a cached URL that's an http(s) URL, try it first
+        String cachedUrl = song.getUrl();
+        if (cachedUrl != null && !cachedUrl.isEmpty()
+                && (cachedUrl.startsWith("http://") || cachedUrl.startsWith("https://"))) {
+            // Try playing the cached URL, but Bilibili URLs expire too
+            // For simplicity, always fetch fresh
+        }
+
+        String bilibiliCookie = getBilibiliCookie();
+        BilibiliApiHelper.getAudioStreamUrl(song.getBvid(), song.getCid(), bilibiliCookie,
+                new BilibiliApiHelper.AudioStreamCallback() {
+                    @Override
+                    public void onResult(String audioUrl) {
+                        song.setUrl(audioUrl);
+                        currentlyPlayingSongId = song.getId();
+                        playWithHeaders(audioUrl);
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        if (callback != null) {
+                            mainHandler.post(() -> callback.onError("B站音频获取失败: " + message));
+                        }
+                    }
+                });
+    }
+
+    /**
+     * Play audio with Bilibili-specific headers (Referer required).
+     */
+    private void playWithHeaders(String url) {
+        stop();
+        mediaPlayer = new MediaPlayer();
+        try {
+            if (appContext != null) {
+                mediaPlayer.setWakeMode(appContext, PowerManager.PARTIAL_WAKE_LOCK);
+            }
+            mediaPlayer.setAudioAttributes(
+                    new AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build());
+
+            // Bilibili requires Referer header for stream URLs
+            java.util.Map<String, String> headers = new java.util.HashMap<>();
+            headers.put("Referer", "https://www.bilibili.com");
+            headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            mediaPlayer.setDataSource(appContext, android.net.Uri.parse(url), headers);
+
+            mediaPlayer.setOnPreparedListener(mp -> {
+                mp.start();
+                applyPlaybackSpeed();
+                isPlaying = true;
+                notifyPlayStateChanged(true);
+            });
+            mediaPlayer.setOnCompletionListener(mp -> onSongCompleted());
+            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                isPlaying = false;
+                notifyPlayStateChanged(false);
+                if (callback != null) {
+                    mainHandler.post(() -> callback.onError("B站播放错误: " + what));
+                }
+                return true;
+            });
+            mediaPlayer.prepareAsync();
+        } catch (Exception e) {
+            if (callback != null) {
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        }
+    }
+
+    /**
+     * Get Bilibili cookie from SharedPreferences.
+     */
+    private String getBilibiliCookie() {
+        if (appContext != null) {
+            SharedPreferences prefs = appContext.getSharedPreferences("music163_settings",
+                    Context.MODE_PRIVATE);
+            return prefs.getString("bilibili_cookie", "");
+        }
+        return "";
     }
 
     private String cookieValue = "";
@@ -547,6 +643,9 @@ public class MusicPlayerManager {
                 songJson.put("name", current.getName());
                 songJson.put("artist", current.getArtist());
                 songJson.put("album", current.getAlbum());
+                if (current.getSource() != null) songJson.put("source", current.getSource());
+                if (current.getBvid() != null) songJson.put("bvid", current.getBvid());
+                if (current.getCid() != 0) songJson.put("cid", current.getCid());
                 editor.putString(KEY_CURRENT_SONG_JSON, songJson.toString());
             } else {
                 editor.remove(KEY_CURRENT_SONG_JSON);
@@ -560,6 +659,9 @@ public class MusicPlayerManager {
                 obj.put("name", s.getName());
                 obj.put("artist", s.getArtist());
                 obj.put("album", s.getAlbum());
+                if (s.getSource() != null) obj.put("source", s.getSource());
+                if (s.getBvid() != null) obj.put("bvid", s.getBvid());
+                if (s.getCid() != 0) obj.put("cid", s.getCid());
                 playlistArr.put(obj);
             }
             editor.putString(KEY_PLAYLIST_JSON, playlistArr.toString());
@@ -606,6 +708,18 @@ public class MusicPlayerManager {
                         obj.optString("artist", ""),
                         obj.optString("album", "")
                 );
+                String source = obj.optString("source", null);
+                if (source != null && !source.isEmpty()) {
+                    song.setSource(source);
+                }
+                String bvid = obj.optString("bvid", null);
+                if (bvid != null && !bvid.isEmpty()) {
+                    song.setBvid(bvid);
+                }
+                long cid = obj.optLong("cid", 0);
+                if (cid != 0) {
+                    song.setCid(cid);
+                }
                 restoredList.add(song);
             }
 

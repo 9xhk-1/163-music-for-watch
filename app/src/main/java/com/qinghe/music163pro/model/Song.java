@@ -10,6 +10,12 @@ public class Song implements Serializable {
     private String artist;
     private String album;
     private String url;
+    /** Source type: null or "netease" for NetEase, "bilibili" for Bilibili */
+    private String source;
+    /** For Bilibili: bvid of the video */
+    private String bvid;
+    /** For Bilibili: cid of the video page */
+    private long cid;
 
     public Song() {}
 
@@ -34,4 +40,18 @@ public class Song implements Serializable {
 
     public String getUrl() { return url; }
     public void setUrl(String url) { this.url = url; }
+
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+
+    public String getBvid() { return bvid; }
+    public void setBvid(String bvid) { this.bvid = bvid; }
+
+    public long getCid() { return cid; }
+    public void setCid(long cid) { this.cid = cid; }
+
+    /** Check if this song is from Bilibili */
+    public boolean isBilibili() {
+        return "bilibili".equals(source);
+    }
 }
