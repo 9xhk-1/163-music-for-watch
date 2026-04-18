@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
@@ -47,7 +48,6 @@ import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.service.MusicPlaybackService;
 import com.qinghe.music163pro.util.MusicLog;
 import com.qinghe.music163pro.util.UpdateChecker;
-import com.qinghe.music163pro.widget.ChorusMarkerView;
 import com.google.android.material.button.MaterialButton;
 
 import java.io.File;
@@ -71,7 +71,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private ImageView btnPlay;
     private ImageView btnFuncMore;
     private SeekBar seekBar;
-    private ChorusMarkerView chorusMarkerView;
+    private View chorusMarkerDot;
     private TextView tvCurrentTime;
     private TextView tvTotalTime;
     private MusicPlayerManager playerManager;
@@ -143,7 +143,6 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnPlay = findViewById(R.id.btn_play);
         btnFuncMore = findViewById(R.id.btn_favorite);
         seekBar = findViewById(R.id.seek_bar);
-        chorusMarkerView = findViewById(R.id.view_chorus_marker);
         tvCurrentTime = findViewById(R.id.tv_current_time);
         tvTotalTime = findViewById(R.id.tv_total_time);
         ImageView btnPrev = findViewById(R.id.btn_prev);
@@ -152,6 +151,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         ImageView btnVolUp = findViewById(R.id.btn_vol_up);
         ImageView btnMore = findViewById(R.id.btn_more);
         btnPlaylistIndicator = findViewById(R.id.btn_playlist_indicator);
+        ensureChorusMarkerDot();
 
         playerManager = MusicPlayerManager.getInstance();
         playerManager.setContext(this);
@@ -847,15 +847,61 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         updateChorusMarker(0);
     }
 
-    private void updateChorusMarker(int durationMs) {
-        if (chorusMarkerView == null) {
+    private void ensureChorusMarkerDot() {
+        if (chorusMarkerDot != null) {
             return;
         }
-        if (durationMs > 0 && currentChorusStartMs >= 0L) {
-            chorusMarkerView.setMarkerTimes(durationMs, currentChorusStartMs);
-        } else {
-            chorusMarkerView.setMarkerTimes(0L);
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
+        View dot = new View(this);
+        int dotSize = dp(5);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(dotSize, dotSize);
+        dot.setLayoutParams(params);
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.OVAL);
+        background.setColor(ContextCompat.getColor(this, R.color.colorAccent));
+        dot.setBackground(background);
+        dot.setVisibility(View.GONE);
+        dot.setClickable(false);
+        dot.setFocusable(false);
+        rootView.addView(dot);
+        chorusMarkerDot = dot;
+    }
+
+    private void updateChorusMarker(int durationMs) {
+        if (chorusMarkerDot == null) {
+            return;
         }
+        if (durationMs <= 0 || currentChorusStartMs < 0L) {
+            chorusMarkerDot.setVisibility(View.GONE);
+            return;
+        }
+        seekBar.post(() -> positionChorusMarker(durationMs));
+    }
+
+    private void positionChorusMarker(int durationMs) {
+        if (chorusMarkerDot == null || seekBar == null || durationMs <= 0 || currentChorusStartMs < 0L) {
+            return;
+        }
+        int seekWidth = seekBar.getWidth();
+        int seekHeight = seekBar.getHeight();
+        if (seekWidth <= 0 || seekHeight <= 0) {
+            chorusMarkerDot.setVisibility(View.GONE);
+            return;
+        }
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
+        int[] rootLocation = new int[2];
+        int[] seekLocation = new int[2];
+        rootView.getLocationInWindow(rootLocation);
+        seekBar.getLocationInWindow(seekLocation);
+
+        float fraction = Math.min(1f, Math.max(0f, (float) currentChorusStartMs / (float) durationMs));
+        float trackLeft = seekLocation[0] - rootLocation[0] + seekBar.getPaddingLeft();
+        float trackRight = seekLocation[0] - rootLocation[0] + seekWidth - seekBar.getPaddingRight();
+        float markerCenterX = trackLeft + (trackRight - trackLeft) * fraction;
+        float markerCenterY = seekLocation[1] - rootLocation[1] + seekHeight / 2f;
+        chorusMarkerDot.setX(markerCenterX - chorusMarkerDot.getWidth() / 2f);
+        chorusMarkerDot.setY(markerCenterY - chorusMarkerDot.getHeight() / 2f);
+        chorusMarkerDot.setVisibility(View.VISIBLE);
     }
 
     private boolean hasChorusRange() {
