@@ -862,6 +862,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         return currentChorusStartMs >= 0L && currentChorusEndMs > currentChorusStartMs;
     }
 
+    private int millisToCeilSeconds(long ms) {
+        return (int) Math.max(0L, (ms + 999L) / 1000L);
+    }
+
     private boolean applySmartClipRange(int totalSec,
                                         int[] startSec,
                                         int[] endSec,
@@ -876,7 +880,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             return false;
         }
         int smartStart = (int) Math.max(0L, currentChorusStartMs / 1000L);
-        int smartEnd = (int) Math.min((long) totalSec, (currentChorusEndMs + 999L) / 1000L);
+        int smartEnd = Math.min(totalSec, millisToCeilSeconds(currentChorusEndMs));
         if (smartEnd <= smartStart) {
             smartEnd = Math.min(totalSec, smartStart + 1);
         }
@@ -902,7 +906,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         button.setText(text);
         button.setAllCaps(false);
         button.setTextSize(12f);
-        button.setTextColor(0xFFFFFFFF);
+        button.setTextColor(ContextCompat.getColor(this, R.color.white));
         button.setCornerRadius(dp(8));
         button.setInsetTop(0);
         button.setInsetBottom(0);
@@ -1961,7 +1965,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         TextView tvChorusRange = new TextView(this);
         tvChorusRange.setText(hasChorusRange()
-                ? "高潮: " + (currentChorusStartMs / 1000L) + "s - " + ((currentChorusEndMs + 999L) / 1000L) + "s"
+                ? "高潮: " + (currentChorusStartMs / 1000L) + "s - " + millisToCeilSeconds(currentChorusEndMs) + "s"
                 : "高潮: 暂无数据");
         tvChorusRange.setTextColor(ContextCompat.getColor(this,
                 hasChorusRange() ? R.color.colorAccent : R.color.text_secondary));

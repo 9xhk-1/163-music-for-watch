@@ -60,7 +60,7 @@ public class ChorusMarkerView extends View {
             if (markerTimeMs < 0L || markerTimeMs > durationMs) {
                 continue;
             }
-            float fraction = durationMs == 0L ? 0f : (float) markerTimeMs / (float) durationMs;
+            float fraction = (float) markerTimeMs / (float) durationMs;
             float x = padding + usableWidth * fraction;
             canvas.drawCircle(x, centerY, radius, markerPaint);
         }
