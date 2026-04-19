@@ -24,6 +24,22 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
         return WatchUiUtils.px(this, baseValue);
     }
 
+    /**
+     * Convert dp to pixels using the device's display density.
+     * Unlike px() which scales by screen width ratio, this follows
+     * Android's standard dp-to-px conversion, ensuring consistency
+     * with XML-defined layout dimensions (e.g., login page buttons at 36dp).
+     */
+    protected final int dpToPx(int dp) {
+        float density = getResources().getDisplayMetrics().density;
+        return (int) (dp * density + 0.5f);
+    }
+
+    /**
+     * Create a MaterialButton styled for watch screens.
+     * Uses dp-based height (matching the XML login buttons at 36dp, 13sp text)
+     * to ensure text is always fully visible regardless of screen density.
+     */
     protected final MaterialButton createWatchButton(String text, boolean outlined) {
         int styleAttr = outlined
                 ? com.google.android.material.R.attr.materialButtonOutlinedStyle
@@ -35,9 +51,10 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
         button.setAllCaps(false);
         button.setInsetTop(0);
         button.setInsetBottom(0);
-        int minHeight = px(36);
-        button.setMinHeight(minHeight);
-        button.setMinimumHeight(minHeight);
+        // Use dp-based minHeight (matching XML button layout_height="36dp")
+        int minHeightPx = dpToPx(36);
+        button.setMinHeight(minHeightPx);
+        button.setMinimumHeight(minHeightPx);
         return button;
     }
 }

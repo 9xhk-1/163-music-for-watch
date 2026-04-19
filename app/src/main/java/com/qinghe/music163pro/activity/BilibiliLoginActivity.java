@@ -78,7 +78,7 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
 
         btnRefresh = createWatchButton("刷新二维码", true);
         btnRefresh.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(36)));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         btnRefresh.setOnClickListener(v -> startQrLogin());
         qrCard.addView(btnRefresh);
 

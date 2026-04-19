@@ -88,7 +88,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
 
         btnFetch = createWatchButton("解析视频", false);
         LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(36));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         btnParams.topMargin = px(8);
         btnFetch.setLayoutParams(btnParams);
         btnFetch.setOnClickListener(v -> fetchVideo());
@@ -105,7 +105,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
 
         btnFavorite = createWatchButton("收藏BV号", true);
         btnFavorite.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(36)));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         ((LinearLayout.LayoutParams) btnFavorite.getLayoutParams()).topMargin = px(4);
         btnFavorite.setVisibility(View.GONE);
         btnFavorite.setOnClickListener(v -> toggleFavoriteCurrentBvid());
@@ -163,7 +163,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
 
                 MaterialButton btnPlayAll = createWatchButton("全部播放 (" + pages.size() + "集)", true);
                 LinearLayout.LayoutParams playAllParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, px(36));
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                 playAllParams.topMargin = px(4);
                 btnPlayAll.setLayoutParams(playAllParams);
                 btnPlayAll.setOnClickListener(v -> playAll(0));

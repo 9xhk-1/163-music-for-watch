@@ -67,7 +67,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
 
         btnPlayAll = createWatchButton("全部播放", false);
         btnPlayAll.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(36)));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         btnPlayAll.setOnClickListener(v -> playIndex(0));
         root.addView(btnPlayAll);
 

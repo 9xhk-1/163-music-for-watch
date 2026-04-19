@@ -72,7 +72,7 @@ public class BilibiliSearchActivity extends BaseWatchActivity {
 
         btnSearch = createWatchButton("搜索", false);
         btnSearch.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(36)));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         ((LinearLayout.LayoutParams) btnSearch.getLayoutParams()).topMargin = px(8);
         btnSearch.setOnClickListener(v -> searchVideos());
         card.addView(btnSearch);
