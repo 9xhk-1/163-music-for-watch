@@ -11,6 +11,19 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
+import androidx.annotation.OptIn;
+import androidx.media3.common.C;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.PlaybackParameters;
+import androidx.media3.common.Player;
+import androidx.media3.common.util.UnstableApi;
+import androidx.media3.datasource.DefaultDataSource;
+import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.exoplayer.DefaultLoadControl;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
+
 import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
@@ -21,8 +34,10 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class MusicPlayerManager {
@@ -73,6 +88,10 @@ public class MusicPlayerManager {
     private Context appContext;
     private long bilibiliRetrySongId = -1;
     private int bilibiliRetryCount = 0;
+
+    // ExoPlayer for Bilibili audio (better seek/buffering than MediaPlayer)
+    private ExoPlayer exoPlayer;
+    private boolean usingExoPlayer = false;
 
     // Bilibili CDN URL pre-refresh timer (URLs expire after ~30 min)
     private static final long BILIBILI_REFRESH_INTERVAL_MS = 25 * 60 * 1000; // 25 minutes
@@ -214,6 +233,27 @@ public class MusicPlayerManager {
     }
 
     private void applyPlaybackSpeed() {
+        // ExoPlayer speed control
+        if (usingExoPlayer && exoPlayer != null) {
+            try {
+                float speed, pitch;
+                if (speedMode == 1) {
+                    speed = playbackSpeed;
+                    pitch = playbackSpeed;
+                } else if (speedMode == 2) {
+                    speed = 1.0f;
+                    pitch = playbackSpeed;
+                } else {
+                    speed = playbackSpeed;
+                    pitch = 1.0f;
+                }
+                exoPlayer.setPlaybackParameters(new PlaybackParameters(speed, pitch));
+            } catch (Exception e) {
+                Log.w(TAG, "Error setting ExoPlayer playback speed", e);
+            }
+            return;
+        }
+        // MediaPlayer speed control
         if (mediaPlayer != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
                 boolean wasPlaying = mediaPlayer.isPlaying();
@@ -350,7 +390,11 @@ public class MusicPlayerManager {
     }
 
     public void pause() {
-        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+        if (usingExoPlayer && exoPlayer != null) {
+            exoPlayer.pause();
+            isPlaying = false;
+            notifyPlayStateChanged(false);
+        } else if (mediaPlayer != null && mediaPlayer.isPlaying()) {
             mediaPlayer.pause();
             isPlaying = false;
             notifyPlayStateChanged(false);
@@ -358,7 +402,11 @@ public class MusicPlayerManager {
     }
 
     public void resume() {
-        if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+        if (usingExoPlayer && exoPlayer != null) {
+            exoPlayer.play();
+            isPlaying = true;
+            notifyPlayStateChanged(true);
+        } else if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
             mediaPlayer.start();
             isPlaying = true;
             notifyPlayStateChanged(true);
@@ -367,6 +415,14 @@ public class MusicPlayerManager {
 
     public void stop() {
         cancelBilibiliRefreshTimer();
+        if (exoPlayer != null) {
+            try {
+                exoPlayer.release();
+            } catch (Exception e) {
+                Log.w(TAG, "Error stopping ExoPlayer", e);
+            }
+            exoPlayer = null;
+        }
         if (mediaPlayer != null) {
             try {
                 if (mediaPlayer.isPlaying()) {
@@ -377,12 +433,20 @@ public class MusicPlayerManager {
                 Log.w(TAG, "Error stopping player", e);
             }
             mediaPlayer = null;
-            isPlaying = false;
-            currentlyPlayingSongId = -1;
         }
+        isPlaying = false;
+        currentlyPlayingSongId = -1;
+        usingExoPlayer = false;
     }
 
     public int getCurrentPosition() {
+        if (usingExoPlayer && exoPlayer != null) {
+            try {
+                return (int) exoPlayer.getCurrentPosition();
+            } catch (Exception e) {
+                return 0;
+            }
+        }
         if (mediaPlayer != null) {
             try {
                 return mediaPlayer.getCurrentPosition();
@@ -394,6 +458,14 @@ public class MusicPlayerManager {
     }
 
     public int getDuration() {
+        if (usingExoPlayer && exoPlayer != null) {
+            try {
+                long dur = exoPlayer.getDuration();
+                return dur == C.TIME_UNSET ? 0 : (int) dur;
+            } catch (Exception e) {
+                return 0;
+            }
+        }
         if (mediaPlayer != null) {
             try {
                 return mediaPlayer.getDuration();
@@ -405,7 +477,13 @@ public class MusicPlayerManager {
     }
 
     public void seekTo(int positionMs) {
-        if (mediaPlayer != null) {
+        if (usingExoPlayer && exoPlayer != null) {
+            try {
+                exoPlayer.seekTo(positionMs);
+            } catch (Exception e) {
+                Log.w(TAG, "Error seeking ExoPlayer", e);
+            }
+        } else if (mediaPlayer != null) {
             try {
                 mediaPlayer.seekTo(positionMs);
             } catch (Exception e) {
@@ -557,104 +635,131 @@ public class MusicPlayerManager {
         playWithHeaders(getCurrentSong(), url, 0);
     }
 
+    /**
+     * Play Bilibili audio using ExoPlayer with custom buffer settings.
+     * ExoPlayer provides much better seek performance and buffering than
+     * MediaPlayer for HTTP streaming, especially on watch devices with
+     * limited resources - preventing stuttering at large seek positions.
+     */
+    @OptIn(markerClass = UnstableApi.class)
     private void playWithHeaders(Song song, String url, int resumePositionMs) {
         stop();
         cancelBilibiliRefreshTimer();
         prefetchedBilibiliUrl = null;
-        mediaPlayer = new MediaPlayer();
-        try {
-            if (appContext != null) {
-                mediaPlayer.setWakeMode(appContext, PowerManager.PARTIAL_WAKE_LOCK);
-            }
-            mediaPlayer.setAudioAttributes(
-                    new AudioAttributes.Builder()
-                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .build());
+        usingExoPlayer = true;
 
-            // Bilibili requires Referer header for stream URLs
-            java.util.Map<String, String> headers = new java.util.HashMap<>();
+        if (appContext == null) {
+            if (callback != null) {
+                mainHandler.post(() -> callback.onError("播放器上下文未初始化"));
+            }
+            return;
+        }
+
+        try {
+            // Buffer settings optimized for watch devices:
+            // - Larger buffers to prevent stuttering at far seek positions
+            // - Generous rebuffer threshold to avoid repeated micro-buffers
+            DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                            30_000,   // minBufferMs: 30 seconds
+                            120_000,  // maxBufferMs: 2 minutes
+                            5_000,    // bufferForPlaybackMs: 5s before starting
+                            15_000    // bufferForPlaybackAfterRebufferMs: 15s after rebuffer
+                    )
+                    .setPrioritizeTimeOverSizeThresholds(true)
+                    .build();
+
+            // HTTP DataSource with Bilibili headers
+            Map<String, String> headers = new HashMap<>();
             headers.put("Referer", "https://www.bilibili.com");
             headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-            mediaPlayer.setDataSource(appContext, android.net.Uri.parse(url), headers);
 
-            mediaPlayer.setOnPreparedListener(mp -> {
-                if (resumePositionMs > 0) {
-                    try {
-                        mp.seekTo(resumePositionMs);
-                    } catch (Exception e) {
-                        Log.w(TAG, "Error seeking Bilibili retry position", e);
+            DefaultHttpDataSource.Factory httpFactory = new DefaultHttpDataSource.Factory()
+                    .setDefaultRequestProperties(headers)
+                    .setConnectTimeoutMs(15_000)
+                    .setReadTimeoutMs(30_000)
+                    .setAllowCrossProtocolRedirects(true);
+
+            DefaultDataSource.Factory dataSourceFactory =
+                    new DefaultDataSource.Factory(appContext, httpFactory);
+
+            exoPlayer = new ExoPlayer.Builder(appContext)
+                    .setLoadControl(loadControl)
+                    .setMediaSourceFactory(new DefaultMediaSourceFactory(dataSourceFactory))
+                    .build();
+
+            exoPlayer.setWakeMode(C.WAKE_MODE_NETWORK);
+            exoPlayer.setAudioAttributes(
+                    new androidx.media3.common.AudioAttributes.Builder()
+                            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                            .setUsage(C.USAGE_MEDIA)
+                            .build(),
+                    true  // handleAudioFocus
+            );
+
+            final Song targetSong = song;
+            exoPlayer.addListener(new Player.Listener() {
+                private boolean prepared = false;
+
+                @Override
+                public void onPlaybackStateChanged(int state) {
+                    if (state == Player.STATE_READY && !prepared) {
+                        prepared = true;
+                        applyPlaybackSpeed();
+                        isPlaying = true;
+                        if (targetSong != null && targetSong.isBilibili()) {
+                            bilibiliRetrySongId = targetSong.getId();
+                            startBilibiliRefreshTimer(targetSong);
+                        }
+                        notifyPlayStateChanged(true);
+                    } else if (state == Player.STATE_ENDED) {
+                        isPlaying = false;
+                        cancelBilibiliRefreshTimer();
+                        onSongCompleted();
                     }
                 }
-                mp.start();
-                applyPlaybackSpeed();
-                isPlaying = true;
-                if (song != null && song.isBilibili()) {
-                    bilibiliRetrySongId = song.getId();
-                    // Start periodic URL refresh timer
-                    startBilibiliRefreshTimer(song);
-                }
-                notifyPlayStateChanged(true);
-            });
-            mediaPlayer.setOnCompletionListener(mp -> {
-                cancelBilibiliRefreshTimer();
-                onSongCompleted();
-            });
-            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
-                isPlaying = false;
-                notifyPlayStateChanged(false);
-                cancelBilibiliRefreshTimer();
-                Song currentSong = getCurrentSong();
-                // Allow up to 3 retries for Bilibili CDN URL expiration
-                if (currentSong != null
-                        && currentSong.isBilibili()
-                        && currentSong.getId() == bilibiliRetrySongId
-                        && bilibiliRetryCount < 3) {
-                    bilibiliRetryCount++;
-                    int pos = safeGetCurrentPosition(mp);
-                    // Use prefetched URL if available (faster recovery)
-                    if (prefetchedBilibiliUrl != null) {
-                        String freshUrl = prefetchedBilibiliUrl;
-                        prefetchedBilibiliUrl = null;
-                        currentSong.setUrl(freshUrl);
-                        currentlyPlayingSongId = currentSong.getId();
-                        playWithHeaders(currentSong, freshUrl, Math.max(pos, 0));
-                    } else {
-                        currentSong.setUrl(null);
-                        retryBilibiliPlayback(currentSong, pos);
-                    }
-                    return true;
-                }
-                if (callback != null) {
-                    mainHandler.post(() -> callback.onError("B站播放错误: " + what));
-                }
-                return true;
-            });
-            // Monitor buffering stalls for proactive URL refresh
-            mediaPlayer.setOnInfoListener((mp, what, extra) -> {
-                if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
-                    Log.d(TAG, "Bilibili buffering started");
-                    // If we have a prefetched URL and playback is stalling,
-                    // seamlessly switch to the new URL
+
+                @Override
+                public void onPlayerError(PlaybackException error) {
+                    isPlaying = false;
+                    notifyPlayStateChanged(false);
+                    cancelBilibiliRefreshTimer();
+
                     Song currentSong = getCurrentSong();
-                    if (currentSong != null && currentSong.isBilibili()
-                            && prefetchedBilibiliUrl != null) {
-                        int pos = safeGetCurrentPosition(mp);
-                        if (pos > 60000) { // Only if played >1 min
+                    // Allow up to 3 retries for Bilibili CDN URL expiration
+                    if (currentSong != null
+                            && currentSong.isBilibili()
+                            && currentSong.getId() == bilibiliRetrySongId
+                            && bilibiliRetryCount < 3) {
+                        bilibiliRetryCount++;
+                        int pos = getCurrentPosition();
+                        // Use prefetched URL if available (faster recovery)
+                        if (prefetchedBilibiliUrl != null) {
                             String freshUrl = prefetchedBilibiliUrl;
                             prefetchedBilibiliUrl = null;
-                            bilibiliRetryCount = 0;
-                            Log.d(TAG, "Proactive Bilibili URL switch at position " + pos);
                             currentSong.setUrl(freshUrl);
                             currentlyPlayingSongId = currentSong.getId();
-                            playWithHeaders(currentSong, freshUrl, pos);
-                            return true;
+                            playWithHeaders(currentSong, freshUrl, Math.max(pos, 0));
+                        } else {
+                            currentSong.setUrl(null);
+                            retryBilibiliPlayback(currentSong, pos);
                         }
+                        return;
+                    }
+                    if (callback != null) {
+                        String errMsg = error.getMessage() != null ? error.getMessage() : "unknown";
+                        mainHandler.post(() -> callback.onError("B站播放错误: " + errMsg));
                     }
                 }
-                return false;
             });
-            mediaPlayer.prepareAsync();
+
+            exoPlayer.setMediaItem(MediaItem.fromUri(url));
+            exoPlayer.prepare();
+
+            if (resumePositionMs > 0) {
+                exoPlayer.seekTo(resumePositionMs);
+            }
+            exoPlayer.setPlayWhenReady(true);
         } catch (Exception e) {
             if (callback != null) {
                 mainHandler.post(() -> callback.onError(e.getMessage()));
@@ -680,17 +785,6 @@ public class MusicPlayerManager {
                         }
                     }
                 });
-    }
-
-    private int safeGetCurrentPosition(MediaPlayer player) {
-        if (player == null) {
-            return 0;
-        }
-        try {
-            return player.getCurrentPosition();
-        } catch (Exception e) {
-            return 0;
-        }
     }
 
     /**
@@ -723,8 +817,8 @@ public class MusicPlayerManager {
                                     if (cs != null && cs.isBilibili()
                                             && cs.getId() == song.getId()
                                             && prefetchedBilibiliUrl != null
-                                            && isPlaying && mediaPlayer != null) {
-                                        int pos = safeGetCurrentPosition(mediaPlayer);
+                                            && isPlaying && exoPlayer != null) {
+                                        int pos = getCurrentPosition();
                                         if (pos > 60000) {
                                             String freshUrl = prefetchedBilibiliUrl;
                                             prefetchedBilibiliUrl = null;
