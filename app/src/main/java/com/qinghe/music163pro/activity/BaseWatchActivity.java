@@ -5,6 +5,8 @@ import android.os.Bundle;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.material.button.MaterialButton;
+import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.WatchUiUtils;
 
 /**
@@ -20,5 +22,39 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
 
     protected final int px(int baseValue) {
         return WatchUiUtils.px(this, baseValue);
+    }
+
+    /**
+     * Convert dp to pixels using the device's display density.
+     * Unlike px() which scales by screen width ratio, this follows
+     * Android's standard dp-to-px conversion, ensuring consistency
+     * with XML-defined layout dimensions (e.g., login page buttons at 36dp).
+     */
+    protected final int dpToPx(int dp) {
+        float density = getResources().getDisplayMetrics().density;
+        return (int) (dp * density + 0.5f);
+    }
+
+    /**
+     * Create a MaterialButton styled for watch screens.
+     * Uses dp-based height (matching the XML login buttons at 36dp, 13sp text)
+     * to ensure text is always fully visible regardless of screen density.
+     */
+    protected final MaterialButton createWatchButton(String text, boolean outlined) {
+        int styleAttr = outlined
+                ? com.google.android.material.R.attr.materialButtonOutlinedStyle
+                : com.google.android.material.R.attr.materialButtonStyle;
+        MaterialButton button = new MaterialButton(this, null, styleAttr);
+        button.setText(text);
+        button.setTextColor(getResources().getColor(R.color.text_primary));
+        button.setTextSize(13);
+        button.setAllCaps(false);
+        button.setInsetTop(0);
+        button.setInsetBottom(0);
+        // Use dp-based minHeight (matching XML button layout_height="36dp")
+        int minHeightPx = dpToPx(36);
+        button.setMinHeight(minHeightPx);
+        button.setMinimumHeight(minHeightPx);
+        return button;
     }
 }

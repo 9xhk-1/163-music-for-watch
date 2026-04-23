@@ -3,8 +3,10 @@ package com.qinghe.music163pro.manager;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.util.Log;
 
+import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
 
@@ -49,11 +51,26 @@ public class DownloadManager {
     public static void downloadSong(Song song, String cookie, DownloadCallback callback) {
         executor.execute(() -> {
             try {
+                if (song.isBilibili()) {
+                    BilibiliApiHelper.getAudioStreamUrl(song.getBvid(), song.getCid(), cookie,
+                            new BilibiliApiHelper.AudioStreamCallback() {
+                                @Override
+                                public void onResult(String url) {
+                                    executor.execute(() -> doDownload(song, url, true, callback));
+                                }
+
+                                @Override
+                                public void onError(String message) {
+                                    mainHandler.post(() -> callback.onError("获取下载链接失败: " + message));
+                                }
+                            });
+                    return;
+                }
                 // First get a fresh URL
                 MusicApiHelper.getSongUrl(song.getId(), cookie, new MusicApiHelper.UrlCallback() {
                     @Override
                     public void onResult(String url) {
-                        executor.execute(() -> doDownload(song, url, callback));
+                        executor.execute(() -> doDownload(song, url, false, callback));
                     }
 
                     @Override
@@ -67,7 +84,8 @@ public class DownloadManager {
         });
     }
 
-    private static void doDownload(Song song, String urlStr, DownloadCallback callback) {
+    private static void doDownload(Song song, String urlStr, boolean bilibili,
+                                   DownloadCallback callback) {
         try {
             File songDir = getSongDir(song);
             if (!songDir.exists()) {
@@ -84,6 +102,9 @@ public class DownloadManager {
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(30000);
             conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+            if (bilibili) {
+                conn.setRequestProperty("Referer", "https://www.bilibili.com");
+            }
 
             try {
                 InputStream is = conn.getInputStream();
@@ -101,7 +122,9 @@ public class DownloadManager {
                 saveSongInfo(songDir, song);
 
                 // Download lyrics
-                downloadLyrics(songDir, song);
+                if (!bilibili) {
+                    downloadLyrics(songDir, song);
+                }
 
                 String filePath = outputFile.getAbsolutePath();
                 mainHandler.post(() -> callback.onSuccess(filePath));
@@ -124,6 +147,9 @@ public class DownloadManager {
             obj.put("name", song.getName());
             obj.put("artist", song.getArtist());
             obj.put("album", song.getAlbum());
+            obj.put("source", song.getSource());
+            obj.put("bvid", song.getBvid());
+            obj.put("cid", song.getCid());
 
             File infoFile = new File(songDir, INFO_FILE);
             FileOutputStream fos = new FileOutputStream(infoFile);
@@ -198,6 +224,9 @@ public class DownloadManager {
                     obj.optString("artist", ""),
                     obj.optString("album", "")
             );
+            song.setSource(obj.optString("source", null));
+            song.setBvid(obj.optString("bvid", ""));
+            song.setCid(obj.optLong("cid", 0));
             // Set URL to the local mp3 path
             File mp3 = new File(songDir, SONG_FILE);
             if (mp3.exists()) {
@@ -214,11 +243,32 @@ public class DownloadManager {
      * Get the subfolder for a song inside the download directory.
      */
     private static File getSongDir(Song song) {
+        File dir = new File(Environment.getExternalStorageDirectory(), DOWNLOAD_DIR);
+        if (song.isBilibili()) {
+            String safeVideoTitle = sanitizeFileName(
+                    !TextUtils.isEmpty(song.getAlbum()) ? song.getAlbum() : song.getName());
+            String safePartTitle = sanitizeFileName(
+                    !TextUtils.isEmpty(song.getName()) ? song.getName() : song.getAlbum());
+            String folderName = safeVideoTitle;
+            if (!safePartTitle.isEmpty() && !safePartTitle.equals(safeVideoTitle)) {
+                folderName = safeVideoTitle + "_" + safePartTitle;
+            }
+            if (folderName.isEmpty()) {
+                folderName = "bilibili_audio_" + song.getCid();
+            }
+            return new File(dir, folderName);
+        }
         String safeName = song.getName().replaceAll("[\\\\/:*?\"<>|]", "_");
         String safeArtist = song.getArtist().replaceAll("[\\\\/:*?\"<>|]", "_");
         String folderName = safeName + " - " + safeArtist;
-        File dir = new File(Environment.getExternalStorageDirectory(), DOWNLOAD_DIR);
         return new File(dir, folderName);
+    }
+
+    private static String sanitizeFileName(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
     }
 
     /**

@@ -65,6 +65,14 @@
         <activity android:name=".activity.UpdateActivity" android:exported="false" />
         <activity android:name=".activity.MvDetailActivity" android:exported="false" />
         <activity android:name=".activity.MvPlayerActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliBvidActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliLoginActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliFavoritesActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliPlaylistActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliSearchActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliCloudFavoritesActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliCloudFavoriteVideosActivity" android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
