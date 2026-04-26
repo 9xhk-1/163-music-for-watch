@@ -49,6 +49,16 @@ public class DownloadManager {
      * Saves both song.mp3 and info.json (with song id, name, artist, album).
      */
     public static void downloadSong(Song song, String cookie, DownloadCallback callback) {
+        downloadSong(song, cookie, "exhigh", callback);
+    }
+
+    /**
+     * Download a song with the specified audio quality level.
+     * Quality: standard / higher / exhigh / lossless / hires / jyeffect / sky / jymaster
+     * Falls back to best free quality if requested level is unavailable.
+     */
+    public static void downloadSong(Song song, String cookie, String quality,
+                                    DownloadCallback callback) {
         executor.execute(() -> {
             try {
                 if (song.isBilibili()) {
@@ -66,8 +76,9 @@ public class DownloadManager {
                             });
                     return;
                 }
-                // First get a fresh URL
-                MusicApiHelper.getSongUrl(song.getId(), cookie, new MusicApiHelper.UrlCallback() {
+                // Get URL with requested quality
+                MusicApiHelper.getSongUrlWithQuality(song.getId(), cookie, quality,
+                        new MusicApiHelper.UrlCallback() {
                     @Override
                     public void onResult(String url) {
                         executor.execute(() -> doDownload(song, url, false, callback));
@@ -82,6 +93,87 @@ public class DownloadManager {
                 mainHandler.post(() -> callback.onError("下载失败: " + e.getMessage()));
             }
         });
+    }
+
+    /**
+     * Download a song to a specific output file (used for caching, e.g. ringtone).
+     * Does NOT save info.json or lyrics. Calls callback with the output file path.
+     */
+    public static void downloadSongToFile(Song song, String cookie, String quality,
+                                          File outputFile, DownloadCallback callback) {
+        executor.execute(() -> {
+            try {
+                if (song.isBilibili()) {
+                    BilibiliApiHelper.getAudioStreamUrl(song.getBvid(), song.getCid(), cookie,
+                            new BilibiliApiHelper.AudioStreamCallback() {
+                                @Override
+                                public void onResult(String url) {
+                                    executor.execute(() -> doDownloadToFile(url, true, outputFile, callback));
+                                }
+
+                                @Override
+                                public void onError(String message) {
+                                    mainHandler.post(() -> callback.onError("获取链接失败: " + message));
+                                }
+                            });
+                    return;
+                }
+                MusicApiHelper.getSongUrlWithQuality(song.getId(), cookie, quality,
+                        new MusicApiHelper.UrlCallback() {
+                    @Override
+                    public void onResult(String url) {
+                        executor.execute(() -> doDownloadToFile(url, false, outputFile, callback));
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        mainHandler.post(() -> callback.onError("获取链接失败: " + message));
+                    }
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> callback.onError("下载失败: " + e.getMessage()));
+            }
+        });
+    }
+
+    private static void doDownloadToFile(String urlStr, boolean bilibili,
+                                         File outputFile, DownloadCallback callback) {
+        try {
+            File parent = outputFile.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
+            }
+
+            URL url = new URL(urlStr);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(30000);
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+            if (bilibili) {
+                conn.setRequestProperty("Referer", "https://www.bilibili.com");
+            }
+
+            try {
+                InputStream is = conn.getInputStream();
+                FileOutputStream fos = new FileOutputStream(outputFile);
+                byte[] buffer = new byte[8192];
+                int len;
+                while ((len = is.read(buffer)) != -1) {
+                    fos.write(buffer, 0, len);
+                }
+                fos.flush();
+                fos.close();
+                is.close();
+
+                String filePath = outputFile.getAbsolutePath();
+                mainHandler.post(() -> callback.onSuccess(filePath));
+            } finally {
+                conn.disconnect();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Download to file error", e);
+            mainHandler.post(() -> callback.onError("下载失败: " + e.getMessage()));
+        }
     }
 
     private static void doDownload(Song song, String urlStr, boolean bilibili,

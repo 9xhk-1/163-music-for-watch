@@ -195,6 +195,67 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    /**
+     * Quality levels in ascending order (matches NetEase API level strings).
+     * The index of a level in this array is its "rank" for comparison.
+     */
+    public static final String[] QUALITY_LEVELS_ORDERED =
+            {"none", "standard", "higher", "exhigh", "lossless", "hires", "jyeffect", "sky", "jymaster"};
+
+    /** Returns the rank index of a quality level string, or 0 for null/"none", -1 for unknown. */
+    public static int qualityLevelRank(String level) {
+        if (level == null) return 0; // null maps to "none" rank (0)
+        for (int i = 0; i < QUALITY_LEVELS_ORDERED.length; i++) {
+            if (QUALITY_LEVELS_ORDERED[i].equals(level)) return i;
+        }
+        return -1;
+    }
+
+    /**
+     * Holds quality privilege info for a single song obtained from /api/v3/song/detail.
+     * <ul>
+     *   <li>{@code flLevel} – max quality playable for free (no VIP login)</li>
+     *   <li>{@code plLevel} – max quality playable with the current login session</li>
+     *   <li>{@code dlLevel} – max quality downloadable with the current login session</li>
+     *   <li>{@code maxBrLevel} – highest quality the song itself has been encoded at</li>
+     * </ul>
+     */
+    public static class SongQualityInfo {
+        public final String flLevel;    // free listening max level
+        public final String plLevel;    // paid/vip listening max level
+        public final String dlLevel;    // download max level
+        public final String maxBrLevel; // song's own max quality
+
+        public SongQualityInfo(String flLevel, String plLevel, String dlLevel, String maxBrLevel) {
+            this.flLevel = flLevel    != null ? flLevel    : "standard";
+            this.plLevel = plLevel    != null ? plLevel    : "exhigh";
+            this.dlLevel = dlLevel    != null ? dlLevel    : "none";
+            this.maxBrLevel = maxBrLevel != null ? maxBrLevel : "exhigh";
+        }
+
+        /** Whether a given quality level is available at all for this song. */
+        public boolean isLevelAvailable(String level) {
+            return qualityLevelRank(level) <= qualityLevelRank(maxBrLevel);
+        }
+
+        /**
+         * Returns the "tier" required for a level:
+         *  "free" = playable without VIP, "vip" = needs VIP/login, "unavailable" = song doesn't have it.
+         */
+        public String getTier(String level) {
+            int rank = qualityLevelRank(level);
+            if (rank < 0) return "unavailable";
+            if (rank > qualityLevelRank(maxBrLevel)) return "unavailable";
+            if (rank <= qualityLevelRank(flLevel)) return "free";
+            return "vip";
+        }
+    }
+
+    public interface SongQualityCallback {
+        void onResult(SongQualityInfo info);
+        void onError(String message);
+    }
+
     public interface ArtistDescCallback {
         void onResult(String briefDesc, JSONArray introduction);
         void onError(String message);
@@ -597,41 +658,57 @@ public class MusicApiHelper {
 
     // ==================== Song URL ====================
 
+    /**
+     * Quality levels supported by NetEase API, in descending order of preference for free fallback.
+     * Levels above "exhigh" require VIP/SVIP membership.
+     */
+    public static final String[] FREE_FALLBACK_LEVELS = {"exhigh", "higher", "standard"};
+
     public static void getSongUrl(long songId, String cookie, UrlCallback callback) {
-        getSongUrl(songId, cookie, true, callback);
+        getSongUrlWithQuality(songId, cookie, "exhigh", callback);
     }
 
     public static void getSongUrl(long songId, String cookie, boolean tryVip, UrlCallback callback) {
+        getSongUrlWithQuality(songId, cookie, tryVip ? "exhigh" : "standard", callback);
+    }
+
+    /**
+     * Fetch song URL with a preferred quality level. If the preferred level is unavailable,
+     * falls back through exhigh → higher → standard → direct link.
+     *
+     * @param preferredLevel desired quality: standard / higher / exhigh / lossless / hires /
+     *                       jyeffect / sky / jymaster
+     */
+    public static void getSongUrlWithQuality(long songId, String cookie,
+                                             String preferredLevel, UrlCallback callback) {
         executor.execute(() -> {
             try {
                 String url = null;
-                MusicLog.op(TAG, "获取歌曲URL", "songId=" + songId + " tryVip=" + tryVip);
+                MusicLog.op(TAG, "获取歌曲URL", "songId=" + songId + " level=" + preferredLevel);
 
-                // Try weapi with VIP quality levels
-                if (tryVip && cookie != null && !cookie.isEmpty()) {
+                // Try preferred level first (may need VIP/SVIP for higher tiers)
+                if (cookie != null && !cookie.isEmpty()) {
                     try {
-                        url = fetchSongUrlWeapi(songId, cookie, "exhigh");
-                        if (url != null) MusicLog.d(TAG, "获取exhigh URL成功: " + songId);
+                        url = fetchSongUrlWeapi(songId, cookie, preferredLevel);
+                        if (url != null) MusicLog.d(TAG, "获取" + preferredLevel + " URL成功: " + songId);
                     } catch (Exception e) {
-                        MusicLog.w(TAG, "weapi exhigh 失败: " + songId, e);
-                    }
-                    if (url == null) {
-                        try {
-                            url = fetchSongUrlWeapi(songId, cookie, "standard");
-                            if (url != null) MusicLog.d(TAG, "获取standard URL成功(vip): " + songId);
-                        } catch (Exception e) {
-                            MusicLog.w(TAG, "weapi standard(vip) 失败: " + songId, e);
-                        }
+                        MusicLog.w(TAG, "weapi " + preferredLevel + " 失败: " + songId, e);
                     }
                 }
 
-                // Fallback: weapi without VIP
+                // Fallback through free quality levels
                 if (url == null) {
-                    try {
-                        url = fetchSongUrlWeapi(songId, cookie, "standard");
-                        if (url != null) MusicLog.d(TAG, "获取standard URL成功(无vip): " + songId);
-                    } catch (Exception e) {
-                        MusicLog.w(TAG, "weapi standard(无vip) 失败: " + songId, e);
+                    for (String level : FREE_FALLBACK_LEVELS) {
+                        if (level.equals(preferredLevel)) continue; // already tried
+                        try {
+                            url = fetchSongUrlWeapi(songId, cookie, level);
+                            if (url != null) {
+                                MusicLog.d(TAG, "回落到" + level + " URL成功: " + songId);
+                                break;
+                            }
+                        } catch (Exception e) {
+                            MusicLog.w(TAG, "weapi " + level + " 失败: " + songId, e);
+                        }
                     }
                 }
 
@@ -651,14 +728,60 @@ public class MusicApiHelper {
     }
 
     /**
-     * Fetch song URL via weapi (same as NeteaseCloudMusicApiBackup module/song_url_v1.js)
+     * Fetch quality privilege info for a song using /api/v3/song/detail.
+     * Corresponds to NeteaseCloudMusicApiBackup module/song_detail.js.
+     *
+     * The returned {@link SongQualityInfo} contains:
+     * <ul>
+     *   <li>flLevel  – max level free users can play</li>
+     *   <li>plLevel  – max level the current login can play</li>
+     *   <li>dlLevel  – max level the current login can download</li>
+     *   <li>maxBrLevel – highest quality the song has</li>
+     * </ul>
      */
+    public static void getSongQualityInfo(long songId, String cookie,
+                                          SongQualityCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("c", "[{\"id\":" + songId + "}]");
+
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/v3/song/detail", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+
+                JSONArray privileges = json.optJSONArray("privileges");
+                if (privileges == null || privileges.length() == 0) {
+                    mainHandler.post(() -> callback.onError("无权限数据"));
+                    return;
+                }
+                JSONObject priv = privileges.getJSONObject(0);
+                String flLevel    = priv.optString("flLevel", "standard");
+                String plLevel    = priv.optString("plLevel", "exhigh");
+                String dlLevel    = priv.optString("dlLevel", "none");
+                String maxBrLevel = priv.optString("maxBrLevel", "exhigh");
+
+                SongQualityInfo info = new SongQualityInfo(flLevel, plLevel, dlLevel, maxBrLevel);
+                MusicLog.d(TAG, "音质信息: songId=" + songId
+                        + " fl=" + flLevel + " pl=" + plLevel + " max=" + maxBrLevel);
+                mainHandler.post(() -> callback.onResult(info));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "getSongQualityInfo 失败: " + songId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
     private static String fetchSongUrlWeapi(long songId, String cookie, String level)
             throws Exception {
         JSONObject data = new JSONObject();
         data.put("ids", "[" + songId + "]");
         data.put("level", level);
         data.put("encodeType", "flac");
+        if ("sky".equals(level)) {
+            data.put("immerseType", "c51");
+        }
 
         String csrfToken = extractCsrfToken(cookie);
         data.put("csrf_token", csrfToken);
