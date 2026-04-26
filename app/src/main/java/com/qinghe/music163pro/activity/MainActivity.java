@@ -2155,9 +2155,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             // Determine tier badge from API info
             String tier;
             if (info == null) {
-                // No API data — show static defaults
+                // No API data — show static defaults based on commonly free levels
                 int rank = MusicApiHelper.qualityLevelRank(level);
-                if (rank <= 3) tier = "免费";        // standard/higher/exhigh/lossless tentative
+                if (rank <= 3) tier = "免费";        // standard(1)/higher(2)/exhigh(3)
                 else tier = "VIP";
             } else {
                 String t = info.getTier(level);

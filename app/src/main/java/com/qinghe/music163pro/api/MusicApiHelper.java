@@ -202,9 +202,9 @@ public class MusicApiHelper {
     public static final String[] QUALITY_LEVELS_ORDERED =
             {"none", "standard", "higher", "exhigh", "lossless", "hires", "jyeffect", "sky", "jymaster"};
 
-    /** Returns the rank index of a quality level string, or -1 if unknown. */
+    /** Returns the rank index of a quality level string, or 0 for null/"none", -1 for unknown. */
     public static int qualityLevelRank(String level) {
-        if (level == null) return 0; // treat null/"none" as 0
+        if (level == null) return 0; // null maps to "none" rank (0)
         for (int i = 0; i < QUALITY_LEVELS_ORDERED.length; i++) {
             if (QUALITY_LEVELS_ORDERED[i].equals(level)) return i;
         }
