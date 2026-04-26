@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Audio quality icon: equalizer bars with a star accent -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Equalizer bar 1 (short) -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M4,14h2v6H4z"/>
+    <!-- Equalizer bar 2 (tall) -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M8,8h2v12H8z"/>
+    <!-- Equalizer bar 3 (medium) -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M12,11h2v9H12z"/>
+    <!-- Star / sparkle at top right to indicate quality -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M19,3l0.75,1.5L21.5,5l-1.75,1.5L20.25,8.5L19,7.25L17.75,8.5L18.25,6.5L16.5,5l1.75,-0.5z"/>
+    <!-- Equalizer bar 4 (short) -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M16,13h2v7H16z"/>
+</vector>

@@ -567,6 +567,25 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 v -> onFuncAddToPlaylist(song)));
         contentLayout.addView(row5);
 
+        // Row 6: 音质
+        LinearLayout row6 = new LinearLayout(this);
+        row6.setOrientation(LinearLayout.HORIZONTAL);
+        row6.setGravity(Gravity.CENTER);
+        row6.setPadding(0, dp(4), 0, 0);
+        row6.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        SharedPreferences qualityPrefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        String curQuality = qualityPrefs.getString("preferred_quality", "exhigh");
+        String qualityLabel = "音质: " + getQualityShortName(curQuality);
+        row6.addView(createFuncItem(R.drawable.ic_audio_quality, qualityLabel,
+                v -> onFuncSelectQuality()));
+        // spacer for symmetric layout
+        View qualitySpacer = new View(this);
+        qualitySpacer.setLayoutParams(new LinearLayout.LayoutParams(0, 0, 1f));
+        row6.addView(qualitySpacer);
+        contentLayout.addView(row6);
+
         scrollView.addView(contentLayout);
         overlayContainer.addView(scrollView);
         rootView.addView(overlayContainer);
@@ -1142,18 +1161,43 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             Toast.makeText(this, "歌曲已下载", Toast.LENGTH_SHORT).show();
             return;
         }
-        Toast.makeText(this, "开始下载...", Toast.LENGTH_SHORT).show();
-        String cookie = getDownloadCookieForSong(song);
-        DownloadManager.downloadSong(song, cookie, new DownloadManager.DownloadCallback() {
-            @Override
-            public void onSuccess(String filePath) {
-                Toast.makeText(MainActivity.this, "下载完成: " + filePath, Toast.LENGTH_LONG).show();
-            }
+        if (song.isBilibili()) {
+            // Bilibili doesn't have quality tiers, download directly
+            String cookie = getDownloadCookieForSong(song);
+            Toast.makeText(this, "开始下载...", Toast.LENGTH_SHORT).show();
+            DownloadManager.downloadSong(song, cookie, new DownloadManager.DownloadCallback() {
+                @Override
+                public void onSuccess(String filePath) {
+                    Toast.makeText(MainActivity.this, "下载完成: " + filePath, Toast.LENGTH_LONG).show();
+                }
 
-            @Override
-            public void onError(String message) {
-                Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
-            }
+                @Override
+                public void onError(String message) {
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else {
+            // Show quality selector before downloading
+            showDownloadQualityOptions(song);
+        }
+    }
+
+    private void showDownloadQualityOptions(Song song) {
+        showQualityOptionsInternal(false, selectedQuality -> {
+            String cookie = getDownloadCookieForSong(song);
+            Toast.makeText(this, "开始下载...", Toast.LENGTH_SHORT).show();
+            DownloadManager.downloadSong(song, cookie, selectedQuality,
+                    new DownloadManager.DownloadCallback() {
+                @Override
+                public void onSuccess(String filePath) {
+                    Toast.makeText(MainActivity.this, "下载完成: " + filePath, Toast.LENGTH_LONG).show();
+                }
+
+                @Override
+                public void onError(String message) {
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                }
+            });
         });
     }
 
@@ -1980,6 +2024,171 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         rootView.addView(overlayContainer);
     }
 
+    // ==================== Audio Quality ====================
+
+    interface QualitySelectCallback {
+        void onSelected(String quality);
+    }
+
+    private void onFuncSelectQuality() {
+        dismissOverlay();
+        showQualityOptionsInternal(true, quality -> {
+            getSharedPreferences("music163_settings", MODE_PRIVATE)
+                    .edit().putString("preferred_quality", quality).apply();
+            Toast.makeText(this, "音质已设置: " + getQualityDisplayName(quality),
+                    Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    /**
+     * Show the quality selection overlay.
+     * @param saveAsPreferred  true = save selection to SharedPreferences (playback quality),
+     *                         false = just call callback for one-time use (download quality)
+     */
+    private void showQualityOptionsInternal(boolean saveAsPreferred,
+                                             QualitySelectCallback callback) {
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
+                .findViewById(android.R.id.content);
+
+        overlayContainer = new FrameLayout(this);
+        overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlayContainer.setBackgroundColor(0xCC000000);
+        addSwipeToDismiss(overlayContainer);
+
+        ScrollView scrollView = new ScrollView(this);
+        FrameLayout.LayoutParams scrollParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        scrollParams.gravity = Gravity.CENTER;
+        scrollView.setLayoutParams(scrollParams);
+        scrollView.setOnClickListener(v -> { /* consume click */ });
+
+        LinearLayout contentLayout = new LinearLayout(this);
+        contentLayout.setOrientation(LinearLayout.VERTICAL);
+        contentLayout.setGravity(Gravity.CENTER);
+        contentLayout.setPadding(dp(20), dp(16), dp(20), dp(16));
+
+        String title = saveAsPreferred ? "播放音质" : "下载音质";
+        contentLayout.addView(createOverlayTitleBar(title));
+
+        String currentQuality = getSharedPreferences("music163_settings", MODE_PRIVATE)
+                .getString("preferred_quality", "exhigh");
+
+        // Quality entries: [level, shortName, bitrate, tier]
+        // tier: 0=免费 1=VIP 2=SVIP
+        String[][] qualities = {
+            {"standard", "标准",     "128K",    "免费"},
+            {"higher",   "较高",     "192K",    "免费"},
+            {"exhigh",   "极高",     "320K",    "免费"},
+            {"lossless", "无损",     "FLAC",    "VIP"},
+            {"hires",    "Hi-Res",   "Hi-Res",  "VIP"},
+            {"jyeffect", "臻品声场", "立体声",  "VIP"},
+            {"sky",      "全景声",   "360°",    "SVIP"},
+            {"jymaster", "臻品母带", "母带",    "SVIP"},
+        };
+
+        for (String[] q : qualities) {
+            String level = q[0];
+            String name = q[1];
+            String bitrate = q[2];
+            String tier = q[3];
+
+            boolean isSelected = saveAsPreferred && level.equals(currentQuality);
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(10), dp(9), dp(10), dp(9));
+            row.setBackgroundColor(isSelected ? 0x33BB86FC : 0xFF2D2D2D);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            rowParams.bottomMargin = dp(4);
+            row.setLayoutParams(rowParams);
+            row.setClickable(true);
+            row.setFocusable(true);
+
+            // Left: name + bitrate
+            LinearLayout leftCol = new LinearLayout(this);
+            leftCol.setOrientation(LinearLayout.VERTICAL);
+            leftCol.setLayoutParams(new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+            TextView tvName = new TextView(this);
+            tvName.setText(name);
+            tvName.setTextColor(isSelected ? 0xFFBB86FC : 0xFFFFFFFF);
+            tvName.setTextSize(14);
+            leftCol.addView(tvName);
+
+            TextView tvBitrate = new TextView(this);
+            tvBitrate.setText(bitrate);
+            tvBitrate.setTextColor(0x80FFFFFF);
+            tvBitrate.setTextSize(11);
+            leftCol.addView(tvBitrate);
+
+            row.addView(leftCol);
+
+            // Right: tier badge
+            int tierColor;
+            switch (tier) {
+                case "VIP":  tierColor = 0xFFFFAA00; break;
+                case "SVIP": tierColor = 0xFFFF5500; break;
+                default:     tierColor = 0xFF4CAF50; break; // 免费
+            }
+            TextView tvTier = new TextView(this);
+            tvTier.setText(tier);
+            tvTier.setTextColor(tierColor);
+            tvTier.setTextSize(11);
+            tvTier.setPadding(dp(6), dp(2), dp(6), dp(2));
+            GradientDrawable tierBg = new GradientDrawable();
+            tierBg.setShape(GradientDrawable.RECTANGLE);
+            tierBg.setCornerRadius(dp(4));
+            tierBg.setColor(0x22FFFFFF);
+            tvTier.setBackground(tierBg);
+            row.addView(tvTier);
+
+            row.setOnClickListener(v -> {
+                callback.onSelected(level);
+                dismissOverlay();
+            });
+
+            contentLayout.addView(row);
+        }
+
+        scrollView.addView(contentLayout);
+        overlayContainer.addView(scrollView);
+        rootView.addView(overlayContainer);
+    }
+
+    /** Short display name for current quality (shown on the button label). */
+    private String getQualityShortName(String level) {
+        switch (level) {
+            case "standard": return "标准";
+            case "higher":   return "较高";
+            case "exhigh":   return "极高";
+            case "lossless": return "无损";
+            case "hires":    return "Hi-Res";
+            case "jyeffect": return "臻品声场";
+            case "sky":      return "全景声";
+            case "jymaster": return "臻品母带";
+            default:         return level;
+        }
+    }
+
+    /** Full display name for quality (shown in toasts). */
+    private String getQualityDisplayName(String level) {
+        switch (level) {
+            case "standard": return "标准 (128K)";
+            case "higher":   return "较高 (192K)";
+            case "exhigh":   return "极高 (320K)";
+            case "lossless": return "无损 (FLAC)";
+            case "hires":    return "Hi-Res";
+            case "jyeffect": return "臻品声场";
+            case "sky":      return "臻品全景声";
+            case "jymaster": return "臻品母带";
+            default:         return level;
+        }
+    }
+
     // ==================== Cloud Favorites Status Cache ====================
 
     private java.util.Set<Long> cloudLikedIds = null;
@@ -2022,23 +2231,34 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Check if song is downloaded first
         String mp3Path = DownloadManager.getDownloadedMp3Path(song);
 
-        if (mp3Path == null) {
-            // Download first, then show clip selection
-            Toast.makeText(this, "正在下载歌曲...", Toast.LENGTH_SHORT).show();
+        if (mp3Path != null) {
+            // Already downloaded locally — use it directly
+            showRingtoneClipOverlay(new File(mp3Path), song.getName());
+        } else {
+            // Cache audio to a temp file (don't save to downloads)
+            Toast.makeText(this, "正在缓存歌曲...", Toast.LENGTH_SHORT).show();
             String cookie = getDownloadCookieForSong(song);
-            DownloadManager.downloadSong(song, cookie, new DownloadManager.DownloadCallback() {
+            SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+            String quality = prefs.getString("preferred_quality", "exhigh");
+
+            File cacheDir = new File(android.os.Environment.getExternalStorageDirectory(),
+                    "163Music/cache");
+            if (!cacheDir.exists()) cacheDir.mkdirs();
+            File tempFile = new File(cacheDir, "ringtone_temp_" + song.getId() + ".mp3");
+
+            DownloadManager.downloadSongToFile(song, cookie, quality, tempFile,
+                    new DownloadManager.DownloadCallback() {
                 @Override
                 public void onSuccess(String filePath) {
-                    runOnUiThread(() -> showRingtoneClipOverlay(new File(filePath), song.getName()));
+                    runOnUiThread(() -> showRingtoneClipOverlay(new File(filePath), song.getName(),
+                            true /* deleteAfterSet */));
                 }
 
                 @Override
                 public void onError(String message) {
-                    Toast.makeText(MainActivity.this, "下载失败，无法设为铃声", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "缓存失败，无法设为铃声", Toast.LENGTH_SHORT).show();
                 }
             });
-        } else {
-            showRingtoneClipOverlay(new File(mp3Path), song.getName());
         }
     }
 
@@ -2053,6 +2273,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     private void showRingtoneClipOverlay(File file, String songTitle) {
+        showRingtoneClipOverlay(file, songTitle, false);
+    }
+
+    private void showRingtoneClipOverlay(File file, String songTitle, boolean deleteTempAfterSet) {
         // Get song duration
         int durationMs;
         try {
@@ -2244,6 +2468,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             stopRingtonePreview();
             String clipTitle = songTitle + " (" + startSec[0] + "s-" + endSec[0] + "s)";
             setRingtoneFromFile(file, clipTitle, startSec[0], endSec[0]);
+            if (deleteTempAfterSet) {
+                // Delete temp cached audio file after setting ringtone
+                try { file.delete(); } catch (Exception ignored) {}
+            }
             dismissOverlay();
         });
         contentLayout.addView(btnConfirm);

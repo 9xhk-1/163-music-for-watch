@@ -80,6 +80,37 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeSpacer(px(8)));
         content.addView(makeDivider());
 
+        // Feedback section
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("问题反馈", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText("遇到问题或有建议，欢迎通过以下方式反馈：",
+                0xFFAAAAAA, px(14), false, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        TextView emailTv = makeText("📧 邮箱：mail@9x.hk", 0xFF5599CC, px(14), false, Gravity.START);
+        Linkify.addLinks(emailTv, Linkify.EMAIL_ADDRESSES);
+        content.addView(emailTv);
+        content.addView(makeSpacer(px(2)));
+        content.addView(makeText("💬 QQ：3686072365", 0xFF5599CC, px(14), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
+        // v20260426 update summary
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("v20260426 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText(
+                "• 增加音质选择功能（播放/下载可分别选择音质，支持标准/较高/极高/无损/Hi-Res/臻品声场/全景声/臻品母带）\n"
+                + "• 增加问题反馈方式\n"
+                + "• 修复设置铃声时自动下载音乐的问题，改为临时缓存，设置完成后自动清除",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
         // v20260418-2 update summary
         content.addView(makeSpacer(px(8)));
         content.addView(makeText("v20260418-2 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));

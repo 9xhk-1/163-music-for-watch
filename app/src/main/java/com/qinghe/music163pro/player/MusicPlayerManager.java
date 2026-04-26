@@ -589,7 +589,16 @@ public class MusicPlayerManager {
         // Always fetch a fresh URL to avoid expired URL issues.
         // NetEase song URLs are time-limited, so cached URLs may not work.
         String cookie = getCookie();
-        MusicApiHelper.getSongUrl(song.getId(), cookie, new MusicApiHelper.UrlCallback() {
+        // Read preferred quality from SharedPreferences
+        String preferredQuality = "exhigh";
+        if (appContext != null) {
+            android.content.SharedPreferences prefs = appContext.getSharedPreferences(
+                    "music163_settings", android.content.Context.MODE_PRIVATE);
+            preferredQuality = prefs.getString("preferred_quality", "exhigh");
+        }
+        String qualityForLambda = preferredQuality;
+        MusicApiHelper.getSongUrlWithQuality(song.getId(), cookie, qualityForLambda,
+                new MusicApiHelper.UrlCallback() {
             @Override
             public void onResult(String freshUrl) {
                 song.setUrl(freshUrl);

@@ -597,41 +597,57 @@ public class MusicApiHelper {
 
     // ==================== Song URL ====================
 
+    /**
+     * Quality levels supported by NetEase API, in descending order of preference for free fallback.
+     * Levels above "exhigh" require VIP/SVIP membership.
+     */
+    public static final String[] FREE_FALLBACK_LEVELS = {"exhigh", "higher", "standard"};
+
     public static void getSongUrl(long songId, String cookie, UrlCallback callback) {
-        getSongUrl(songId, cookie, true, callback);
+        getSongUrlWithQuality(songId, cookie, "exhigh", callback);
     }
 
     public static void getSongUrl(long songId, String cookie, boolean tryVip, UrlCallback callback) {
+        getSongUrlWithQuality(songId, cookie, tryVip ? "exhigh" : "standard", callback);
+    }
+
+    /**
+     * Fetch song URL with a preferred quality level. If the preferred level is unavailable,
+     * falls back through exhigh → higher → standard → direct link.
+     *
+     * @param preferredLevel desired quality: standard / higher / exhigh / lossless / hires /
+     *                       jyeffect / sky / jymaster
+     */
+    public static void getSongUrlWithQuality(long songId, String cookie,
+                                             String preferredLevel, UrlCallback callback) {
         executor.execute(() -> {
             try {
                 String url = null;
-                MusicLog.op(TAG, "获取歌曲URL", "songId=" + songId + " tryVip=" + tryVip);
+                MusicLog.op(TAG, "获取歌曲URL", "songId=" + songId + " level=" + preferredLevel);
 
-                // Try weapi with VIP quality levels
-                if (tryVip && cookie != null && !cookie.isEmpty()) {
+                // Try preferred level first (may need VIP/SVIP for higher tiers)
+                if (cookie != null && !cookie.isEmpty()) {
                     try {
-                        url = fetchSongUrlWeapi(songId, cookie, "exhigh");
-                        if (url != null) MusicLog.d(TAG, "获取exhigh URL成功: " + songId);
+                        url = fetchSongUrlWeapi(songId, cookie, preferredLevel);
+                        if (url != null) MusicLog.d(TAG, "获取" + preferredLevel + " URL成功: " + songId);
                     } catch (Exception e) {
-                        MusicLog.w(TAG, "weapi exhigh 失败: " + songId, e);
-                    }
-                    if (url == null) {
-                        try {
-                            url = fetchSongUrlWeapi(songId, cookie, "standard");
-                            if (url != null) MusicLog.d(TAG, "获取standard URL成功(vip): " + songId);
-                        } catch (Exception e) {
-                            MusicLog.w(TAG, "weapi standard(vip) 失败: " + songId, e);
-                        }
+                        MusicLog.w(TAG, "weapi " + preferredLevel + " 失败: " + songId, e);
                     }
                 }
 
-                // Fallback: weapi without VIP
+                // Fallback through free quality levels
                 if (url == null) {
-                    try {
-                        url = fetchSongUrlWeapi(songId, cookie, "standard");
-                        if (url != null) MusicLog.d(TAG, "获取standard URL成功(无vip): " + songId);
-                    } catch (Exception e) {
-                        MusicLog.w(TAG, "weapi standard(无vip) 失败: " + songId, e);
+                    for (String level : FREE_FALLBACK_LEVELS) {
+                        if (level.equals(preferredLevel)) continue; // already tried
+                        try {
+                            url = fetchSongUrlWeapi(songId, cookie, level);
+                            if (url != null) {
+                                MusicLog.d(TAG, "回落到" + level + " URL成功: " + songId);
+                                break;
+                            }
+                        } catch (Exception e) {
+                            MusicLog.w(TAG, "weapi " + level + " 失败: " + songId, e);
+                        }
                     }
                 }
 
