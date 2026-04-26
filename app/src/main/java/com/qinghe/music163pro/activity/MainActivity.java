@@ -1183,7 +1183,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     private void showDownloadQualityOptions(Song song) {
-        showQualityOptionsInternal(false, selectedQuality -> {
+        showQualityOptionsInternal(false, song, selectedQuality -> {
             String cookie = getDownloadCookieForSong(song);
             Toast.makeText(this, "开始下载...", Toast.LENGTH_SHORT).show();
             DownloadManager.downloadSong(song, cookie, selectedQuality,
@@ -2032,7 +2032,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     private void onFuncSelectQuality() {
         dismissOverlay();
-        showQualityOptionsInternal(true, quality -> {
+        Song song = playerManager.getCurrentSong();
+        showQualityOptionsInternal(true, song, quality -> {
             getSharedPreferences("music163_settings", MODE_PRIVATE)
                     .edit().putString("preferred_quality", quality).apply();
             Toast.makeText(this, "音质已设置: " + getQualityDisplayName(quality),
@@ -2041,11 +2042,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     /**
-     * Show the quality selection overlay.
+     * Show the quality selection overlay, fetching availability from the API.
      * @param saveAsPreferred  true = save selection to SharedPreferences (playback quality),
      *                         false = just call callback for one-time use (download quality)
+     * @param song             the song to check quality availability for (may be null)
      */
-    private void showQualityOptionsInternal(boolean saveAsPreferred,
+    private void showQualityOptionsInternal(boolean saveAsPreferred, Song song,
                                              QualitySelectCallback callback) {
         FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
                 .findViewById(android.R.id.content);
@@ -2071,57 +2073,135 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String title = saveAsPreferred ? "播放音质" : "下载音质";
         contentLayout.addView(createOverlayTitleBar(title));
 
+        // Placeholder for quality rows — filled once API returns
+        LinearLayout qualityListLayout = new LinearLayout(this);
+        qualityListLayout.setOrientation(LinearLayout.VERTICAL);
+        contentLayout.addView(qualityListLayout);
+
+        // Loading indicator
+        android.widget.ProgressBar loading = new android.widget.ProgressBar(this);
+        LinearLayout.LayoutParams loadParams = new LinearLayout.LayoutParams(
+                dp(32), dp(32));
+        loadParams.gravity = Gravity.CENTER_HORIZONTAL;
+        loadParams.topMargin = dp(8);
+        loadParams.bottomMargin = dp(8);
+        loading.setLayoutParams(loadParams);
+        qualityListLayout.addView(loading);
+
+        scrollView.addView(contentLayout);
+        overlayContainer.addView(scrollView);
+        rootView.addView(overlayContainer);
+
+        // Fetch quality info from API (only for NetEase songs with a valid ID)
+        long songId = (song != null && !song.isBilibili() && song.getId() > 0) ? song.getId() : 0;
+        String cookie = playerManager.getCookie();
         String currentQuality = getSharedPreferences("music163_settings", MODE_PRIVATE)
                 .getString("preferred_quality", "exhigh");
 
-        // Quality entries: [level, shortName, bitrate, tier]
-        // tier: 0=免费 1=VIP 2=SVIP
+        if (songId > 0) {
+            MusicApiHelper.getSongQualityInfo(songId, cookie, new MusicApiHelper.SongQualityCallback() {
+                @Override
+                public void onResult(MusicApiHelper.SongQualityInfo info) {
+                    runOnUiThread(() -> {
+                        qualityListLayout.removeAllViews();
+                        buildQualityRows(qualityListLayout, info, currentQuality,
+                                saveAsPreferred, callback);
+                    });
+                }
+                @Override
+                public void onError(String message) {
+                    runOnUiThread(() -> {
+                        qualityListLayout.removeAllViews();
+                        // Fallback: show all levels without availability info
+                        buildQualityRows(qualityListLayout, null, currentQuality,
+                                saveAsPreferred, callback);
+                    });
+                }
+            });
+        } else {
+            qualityListLayout.removeAllViews();
+            buildQualityRows(qualityListLayout, null, currentQuality, saveAsPreferred, callback);
+        }
+    }
+
+    /**
+     * Build quality option rows into the given layout.
+     * @param info          song-specific quality info from API; null = show all without availability
+     */
+    private void buildQualityRows(LinearLayout container,
+                                   MusicApiHelper.SongQualityInfo info,
+                                   String currentQuality,
+                                   boolean saveAsPreferred,
+                                   QualitySelectCallback callback) {
+        // level, shortName, bitrate description
         String[][] qualities = {
-            {"standard", "标准",     "128K",    "免费"},
-            {"higher",   "较高",     "192K",    "免费"},
-            {"exhigh",   "极高",     "320K",    "免费"},
-            {"lossless", "无损",     "FLAC",    "VIP"},
-            {"hires",    "Hi-Res",   "Hi-Res",  "VIP"},
-            {"jyeffect", "臻品声场", "立体声",  "VIP"},
-            {"sky",      "全景声",   "360°",    "SVIP"},
-            {"jymaster", "臻品母带", "母带",    "SVIP"},
+            {"standard", "标准",     "128K MP3"},
+            {"higher",   "较高",     "192K MP3"},
+            {"exhigh",   "极高",     "320K MP3"},
+            {"lossless", "无损",     "FLAC"},
+            {"hires",    "Hi-Res",   "Hi-Res FLAC"},
+            {"jyeffect", "臻品声场", "高清环绕声"},
+            {"sky",      "全景声",   "沉浸环绕声"},
+            {"jymaster", "臻品母带", "超清母带"},
         };
 
         for (String[] q : qualities) {
-            String level = q[0];
-            String name = q[1];
+            String level   = q[0];
+            String name    = q[1];
             String bitrate = q[2];
-            String tier = q[3];
 
             boolean isSelected = saveAsPreferred && level.equals(currentQuality);
+
+            // Determine tier badge from API info
+            String tier;
+            if (info == null) {
+                // No API data — show static defaults
+                int rank = MusicApiHelper.qualityLevelRank(level);
+                if (rank <= 3) tier = "免费";        // standard/higher/exhigh/lossless tentative
+                else tier = "VIP";
+            } else {
+                String t = info.getTier(level);
+                switch (t) {
+                    case "free":        tier = "免费"; break;
+                    case "vip":         tier = "VIP";  break;
+                    case "unavailable": tier = "暂无"; break;
+                    default:            tier = "VIP";  break;
+                }
+            }
+
+            boolean unavailable = "暂无".equals(tier);
 
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(android.view.Gravity.CENTER_VERTICAL);
             row.setPadding(dp(10), dp(9), dp(10), dp(9));
-            row.setBackgroundColor(isSelected ? 0x33BB86FC : 0xFF2D2D2D);
+            int bgColor = unavailable ? 0xFF222222 : (isSelected ? 0x33BB86FC : 0xFF2D2D2D);
+            row.setBackgroundColor(bgColor);
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             rowParams.bottomMargin = dp(4);
             row.setLayoutParams(rowParams);
-            row.setClickable(true);
-            row.setFocusable(true);
+            if (!unavailable) {
+                row.setClickable(true);
+                row.setFocusable(true);
+            }
 
-            // Left: name + bitrate
+            // Left column: name + bitrate
             LinearLayout leftCol = new LinearLayout(this);
             leftCol.setOrientation(LinearLayout.VERTICAL);
-            leftCol.setLayoutParams(new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            leftCol.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
             TextView tvName = new TextView(this);
             tvName.setText(name);
-            tvName.setTextColor(isSelected ? 0xFFBB86FC : 0xFFFFFFFF);
+            int nameColor = unavailable ? 0x60FFFFFF : (isSelected ? 0xFFBB86FC : 0xFFFFFFFF);
+            tvName.setTextColor(nameColor);
             tvName.setTextSize(14);
             leftCol.addView(tvName);
 
             TextView tvBitrate = new TextView(this);
             tvBitrate.setText(bitrate);
-            tvBitrate.setTextColor(0x80FFFFFF);
+            tvBitrate.setTextColor(unavailable ? 0x30FFFFFF : 0x80FFFFFF);
             tvBitrate.setTextSize(11);
             leftCol.addView(tvBitrate);
 
@@ -2131,7 +2211,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             int tierColor;
             switch (tier) {
                 case "VIP":  tierColor = 0xFFFFAA00; break;
-                case "SVIP": tierColor = 0xFFFF5500; break;
+                case "暂无": tierColor = 0x60FFFFFF; break;
                 default:     tierColor = 0xFF4CAF50; break; // 免费
             }
             TextView tvTier = new TextView(this);
@@ -2146,17 +2226,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             tvTier.setBackground(tierBg);
             row.addView(tvTier);
 
-            row.setOnClickListener(v -> {
-                callback.onSelected(level);
-                dismissOverlay();
-            });
+            if (!unavailable) {
+                row.setOnClickListener(v -> {
+                    callback.onSelected(level);
+                    dismissOverlay();
+                });
+            }
 
-            contentLayout.addView(row);
+            container.addView(row);
         }
-
-        scrollView.addView(contentLayout);
-        overlayContainer.addView(scrollView);
-        rootView.addView(overlayContainer);
     }
 
     /** Short display name for current quality (shown on the button label). */

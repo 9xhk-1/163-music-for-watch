@@ -5,12 +5,14 @@ import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.WindowManager;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.text.util.Linkify;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.qinghe.music163pro.R;
 
@@ -86,12 +88,14 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeSpacer(px(4)));
         content.addView(makeText("遇到问题或有建议，欢迎通过以下方式反馈：",
                 0xFFAAAAAA, px(14), false, Gravity.START));
+        content.addView(makeSpacer(px(6)));
+        // Email row
+        content.addView(makeIconTextRow(R.drawable.ic_email, "邮箱：mail@9x.hk",
+                0xFF5599CC, px(14), true));
         content.addView(makeSpacer(px(4)));
-        TextView emailTv = makeText("📧 邮箱：mail@9x.hk", 0xFF5599CC, px(14), false, Gravity.START);
-        Linkify.addLinks(emailTv, Linkify.EMAIL_ADDRESSES);
-        content.addView(emailTv);
-        content.addView(makeSpacer(px(2)));
-        content.addView(makeText("💬 QQ：3686072365", 0xFF5599CC, px(14), false, Gravity.START));
+        // QQ row
+        content.addView(makeIconTextRow(R.drawable.ic_chat_bubble, "QQ：3686072365",
+                0xFF5599CC, px(14), false));
 
         // Divider
         content.addView(makeSpacer(px(8)));
@@ -480,6 +484,44 @@ public class AboutActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         tv.setLayoutParams(params);
         return tv;
+    }
+
+    /**
+     * Creates a horizontal row with a small vector icon on the left and text on the right.
+     * @param iconRes       drawable resource id (vector icon)
+     * @param text          text to display
+     * @param textColor     text color
+     * @param textSizePx    text size in pixels
+     * @param linkify       whether to auto-linkify the text (email/URL)
+     */
+    private LinearLayout makeIconTextRow(int iconRes, String text, int textColor,
+                                         int textSizePx, boolean linkify) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        row.setLayoutParams(rowParams);
+
+        int iconSize = px(18);
+        ImageView icon = new ImageView(this);
+        icon.setImageDrawable(ContextCompat.getDrawable(this, iconRes));
+        icon.setColorFilter(textColor);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        iconParams.rightMargin = px(6);
+        icon.setLayoutParams(iconParams);
+        row.addView(icon);
+
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextColor(textColor);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSizePx);
+        tv.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        if (linkify) Linkify.addLinks(tv, Linkify.EMAIL_ADDRESSES | Linkify.WEB_URLS);
+        row.addView(tv);
+
+        return row;
     }
 
     private android.view.View makeSpacer(int heightPx) {
