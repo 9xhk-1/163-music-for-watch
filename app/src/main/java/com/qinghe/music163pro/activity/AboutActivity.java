@@ -101,6 +101,21 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeSpacer(px(8)));
         content.addView(makeDivider());
 
+        // v20260429 update summary
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("v20260429 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText(
+                "• 增加歌词滚动模式设置（每行/阻塞），阻塞模式下可双击歌词跳转到对应时间\n"
+                + "• 增加歌词恢复间隔设置（阻塞模式下，无操作若干秒后自动恢复跟随）\n"
+                + "• 评论头像改为显示真实头像\n"
+                + "• 歌曲信息页面增加专辑封面显示（300×300）",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
         // v20260426 update summary
         content.addView(makeSpacer(px(8)));
         content.addView(makeText("v20260426 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));

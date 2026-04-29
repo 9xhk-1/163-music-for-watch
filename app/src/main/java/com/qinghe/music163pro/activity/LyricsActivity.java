@@ -3,6 +3,8 @@ package com.qinghe.music163pro.activity;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -28,11 +30,19 @@ import java.util.regex.Pattern;
 /**
  * Displays scrolling lyrics synchronized with music playback.
  * Reads lyrics from local .lrc file if available, otherwise fetches from API.
+ *
+ * Supports two scroll modes (configurable in settings):
+ *  - 每行 (LYRIC_MODE_FOLLOW=0): always auto-scrolls to current line
+ *  - 阻塞 (LYRIC_MODE_BLOCK=1): pauses auto-scroll when user scrolls;
+ *    resumes after configured interval seconds; double-tap to seek to that line
  */
 public class LyricsActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "music163_settings";
     private static final Pattern LRC_PATTERN = Pattern.compile("\\[(\\d{1,3}):(\\d{2})\\.?(\\d{0,3})\\](.*)");
+
+    private static final int LYRIC_MODE_FOLLOW = 0;
+    private static final int LYRIC_MODE_BLOCK  = 1;
 
     private ScrollView svLyrics;
     private LinearLayout llContainer;
@@ -46,6 +56,12 @@ public class LyricsActivity extends AppCompatActivity {
 
     private final Handler scrollHandler = new Handler();
     private Runnable scrollRunnable;
+
+    // Blocking mode fields
+    private int lyricScrollMode = LYRIC_MODE_FOLLOW;
+    private int lyricResumeIntervalMs = 3000;
+    private volatile boolean userScrolled = false;
+    private volatile long lastUserScrollTime = 0L;
 
     private static class LyricLine {
         long timeMs;
@@ -68,6 +84,12 @@ public class LyricsActivity extends AppCompatActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
+        // Read lyric scroll settings
+        lyricScrollMode = prefs.getInt("lyric_scroll_mode", LYRIC_MODE_FOLLOW);
+        int intervalSec = prefs.getInt("lyric_resume_interval", 3);
+        if (intervalSec < 1) intervalSec = 1;
+        lyricResumeIntervalMs = intervalSec * 1000;
+
         svLyrics = findViewById(R.id.sv_lyrics);
         llContainer = findViewById(R.id.ll_lyrics_container);
         tvSongName = findViewById(R.id.tv_lyrics_song_name);
@@ -86,8 +108,33 @@ public class LyricsActivity extends AppCompatActivity {
 
         tvSongName.setText(song.getName() + " - " + song.getArtist());
 
+        // In blocking mode, detect manual scroll to pause auto-scroll
+        if (lyricScrollMode == LYRIC_MODE_BLOCK) {
+            setupScrollDetection();
+        }
+
         loadLyrics(song);
     }
+
+    /**
+     * Attach a scroll-change listener to the ScrollView so we can detect
+     * when the user manually scrolls (blocking mode).
+     */
+    private void setupScrollDetection() {
+        svLyrics.getViewTreeObserver().addOnScrollChangedListener(() -> {
+            // We distinguish user-initiated scrolls by checking if the
+            // auto-scroll is currently in the middle of a smoothScrollTo.
+            // The simplest reliable heuristic: mark userScrolled whenever
+            // the scroll position changes while our programmatic flag is false.
+            if (!programmaticScroll) {
+                userScrolled = true;
+                lastUserScrollTime = System.currentTimeMillis();
+            }
+        });
+    }
+
+    /** Set to true while we issue smoothScrollTo so we don't mis-detect it as user scroll. */
+    private boolean programmaticScroll = false;
 
     private void loadLyrics(Song song) {
         // Try to load from local .lrc file first
@@ -248,13 +295,35 @@ public class LyricsActivity extends AppCompatActivity {
             return;
         }
 
-        for (LyricLine line : lyricLines) {
+        for (int i = 0; i < lyricLines.size(); i++) {
+            final int index = i;
+            LyricLine line = lyricLines.get(i);
             TextView tv = new TextView(this);
             tv.setText(line.text);
             tv.setTextColor(0xB3FFFFFF);
             tv.setTextSize(13);
             tv.setGravity(android.view.Gravity.CENTER);
             tv.setPadding(0, dp(6), 0, dp(6));
+
+            // In blocking mode, double-tap to seek to that lyric's time
+            if (lyricScrollMode == LYRIC_MODE_BLOCK) {
+                GestureDetector gd = new GestureDetector(this,
+                        new GestureDetector.SimpleOnGestureListener() {
+                            @Override
+                            public boolean onDoubleTap(MotionEvent e) {
+                                long seekMs = lyricLines.get(index).timeMs;
+                                playerManager.seekTo((int) seekMs);
+                                // Immediately resume auto-scroll to the seeked position
+                                userScrolled = false;
+                                Toast.makeText(LyricsActivity.this,
+                                        "跳转到: " + formatTime((int) seekMs),
+                                        Toast.LENGTH_SHORT).show();
+                                return true;
+                            }
+                        });
+                tv.setOnTouchListener((v, event) -> gd.onTouchEvent(event));
+            }
+
             llContainer.addView(tv);
             lyricViews.add(tv);
         }
@@ -284,6 +353,14 @@ public class LyricsActivity extends AppCompatActivity {
                     // Update time display
                     tvTime.setText(formatTime(currentPos) + " / " + formatTime(duration));
 
+                    // In blocking mode, check if we should resume auto-scroll
+                    if (lyricScrollMode == LYRIC_MODE_BLOCK && userScrolled) {
+                        long now = System.currentTimeMillis();
+                        if (now - lastUserScrollTime >= lyricResumeIntervalMs) {
+                            userScrolled = false;
+                        }
+                    }
+
                     // Find current lyric line
                     int newIndex = findCurrentLyricIndex(currentPos);
                     if (newIndex != currentHighlightIndex && newIndex >= 0) {
@@ -299,8 +376,10 @@ public class LyricsActivity extends AppCompatActivity {
                             currentView.setTextColor(0xFFFFFFFF);
                             currentView.setTextSize(14);
 
-                            // Scroll to center the current line
-                            scrollToLine(currentHighlightIndex);
+                            // Scroll to center the current line only if not blocked by user
+                            if (lyricScrollMode == LYRIC_MODE_FOLLOW || !userScrolled) {
+                                scrollToLine(currentHighlightIndex);
+                            }
                         }
                     }
                 }
@@ -326,11 +405,14 @@ public class LyricsActivity extends AppCompatActivity {
         if (index < 0 || index >= lyricViews.size()) return;
         final TextView target = lyricViews.get(index);
         target.post(() -> {
+            programmaticScroll = true;
             int scrollViewHeight = svLyrics.getHeight();
             int targetTop = target.getTop();
             int targetHeight = target.getHeight();
             int scrollTo = targetTop - (scrollViewHeight / 2) + (targetHeight / 2);
             svLyrics.smoothScrollTo(0, Math.max(0, scrollTo));
+            // Reset flag shortly after animation starts
+            scrollHandler.postDelayed(() -> programmaticScroll = false, 400);
         });
     }
 

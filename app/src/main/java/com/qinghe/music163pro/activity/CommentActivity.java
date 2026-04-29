@@ -21,6 +21,7 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -31,6 +32,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.util.MusicLog;
+import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
 
 import org.json.JSONArray;
@@ -409,9 +411,11 @@ public class CommentActivity extends BaseWatchActivity {
         JSONObject user = comment.optJSONObject("user");
         String nickname = "匿名用户";
         long userId = 0;
+        String avatarUrl = "";
         if (user != null) {
             nickname = user.optString("nickname", "匿名用户");
             userId = user.optLong("userId", 0);
+            avatarUrl = user.optString("avatarUrl", "");
         }
 
         // IP location
@@ -426,7 +430,7 @@ public class CommentActivity extends BaseWatchActivity {
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
 
-        header.addView(buildAvatarView(nickname, userId));
+        header.addView(buildAvatarView(nickname, userId, avatarUrl));
 
         LinearLayout nameTimeCol = new LinearLayout(this);
         nameTimeCol.setOrientation(LinearLayout.VERTICAL);
@@ -624,8 +628,27 @@ public class CommentActivity extends BaseWatchActivity {
     //  Avatar
     // ──────────────────────────────────────────────────────
 
-    private View buildAvatarView(String nickname, long userId) {
+    private View buildAvatarView(String nickname, long userId, String avatarUrl) {
         int size = px(26);
+
+        if (avatarUrl != null && !avatarUrl.isEmpty()) {
+            // Use real avatar image
+            ImageView imageView = new ImageView(this);
+            imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            GradientDrawable circleBg = new GradientDrawable();
+            circleBg.setShape(GradientDrawable.OVAL);
+            int colorIndex = (int) (Math.abs(userId) % AVATAR_COLORS.length);
+            circleBg.setColor(AVATAR_COLORS[colorIndex]);
+            circleBg.setSize(size, size);
+            imageView.setBackground(circleBg);
+            imageView.setClipToOutline(true);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
+            imageView.setLayoutParams(params);
+            NetworkImageLoader.load(imageView, avatarUrl);
+            return imageView;
+        }
+
+        // Fallback: colored circle with initial letter
         int colorIndex = (int) (Math.abs(userId) % AVATAR_COLORS.length);
         int bgColor = AVATAR_COLORS[colorIndex];
         String initial = "";
