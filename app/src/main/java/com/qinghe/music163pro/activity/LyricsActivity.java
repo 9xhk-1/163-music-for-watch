@@ -5,6 +5,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -56,6 +58,11 @@ public class LyricsActivity extends AppCompatActivity {
 
     private final Handler scrollHandler = new Handler();
     private Runnable scrollRunnable;
+    private GestureDetector lyricsGestureDetector;
+    private int touchSlop;
+    private boolean touchStartedInLyricsView = false;
+    private float touchDownRawX = 0f;
+    private float touchDownRawY = 0f;
 
     // Blocking mode fields
     private int lyricScrollMode = LYRIC_MODE_FOLLOW;
@@ -98,6 +105,7 @@ public class LyricsActivity extends AppCompatActivity {
         tvSongName.setSelected(true); // enable marquee
 
         playerManager = MusicPlayerManager.getInstance();
+        touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
 
         Song song = playerManager.getCurrentSong();
         if (song == null) {
@@ -108,8 +116,6 @@ public class LyricsActivity extends AppCompatActivity {
 
         tvSongName.setText(song.getName() + " - " + song.getArtist());
 
-        // In blocking mode, attach a single touch listener on the ScrollView to
-        // detect user scrolls (ACTION_MOVE) and double-taps for seeking.
         if (lyricScrollMode == LYRIC_MODE_BLOCK) {
             setupBlockingModeDetection();
         }
@@ -117,78 +123,118 @@ public class LyricsActivity extends AppCompatActivity {
         loadLyrics(song);
     }
 
-    /**
-     * Attach a touch listener directly on svLyrics (the ScrollView).
-     *
-     * Why on the ScrollView instead of on individual TextViews:
-     *   ScrollView.onInterceptTouchEvent() steals ACTION_MOVE from children, so a
-     *   GestureDetector on a child TextView never receives a complete gesture stream
-     *   for double-tap detection. The ScrollView's own touch listener fires BEFORE
-     *   children and before interception, giving us a complete event stream.
-     *
-     * ACTION_MOVE → user is deliberately scrolling → set userScrolled flag
-     * onDoubleTap → calculate which lyric row was tapped → seek player to that time
-     */
     private void setupBlockingModeDetection() {
-        GestureDetector blockGd = new GestureDetector(this,
+        lyricsGestureDetector = new GestureDetector(this,
                 new GestureDetector.SimpleOnGestureListener() {
-
                     @Override
                     public boolean onDown(MotionEvent e) {
-                        // Must return true so the detector keeps tracking this gesture.
                         return true;
                     }
 
                     @Override
                     public boolean onDoubleTap(MotionEvent e) {
-                        // Convert event Y (relative to ScrollView viewport) to content Y
-                        int tapYInContent = (int) e.getY() + svLyrics.getScrollY();
-                        int idx = findLyricViewAtY(tapYInContent);
-                        if (idx >= 0) {
-                            long seekMs = lyricLines.get(idx).timeMs;
-                            playerManager.seekTo((int) seekMs);
-                            // Release the user-scroll block immediately
-                            userScrolled = false;
-                            // Force re-highlight on next tick
-                            currentHighlightIndex = -1;
-                            Toast.makeText(LyricsActivity.this,
-                                    "跳转到: " + formatTime((int) seekMs),
-                                    Toast.LENGTH_SHORT).show();
-                            return true;
+                        if (!isPointInsideView(e.getRawX(), e.getRawY(), svLyrics)) {
+                            return false;
                         }
-                        return false;
+                        int idx = findLyricViewAtRawY(e.getRawY());
+                        if (idx < 0 || idx >= lyricLines.size()) {
+                            return false;
+                        }
+                        int seekMs = (int) lyricLines.get(idx).timeMs;
+                        playerManager.seekTo(seekMs);
+                        userScrolled = false;
+                        lastUserScrollTime = 0L;
+                        currentHighlightIndex = -1;
+                        scrollToLine(idx);
+                        Toast.makeText(LyricsActivity.this,
+                                "跳转到: " + formatTime(seekMs),
+                                Toast.LENGTH_SHORT).show();
+                        return true;
                     }
                 });
-
-        svLyrics.setOnTouchListener((v, event) -> {
-            int action = event.getActionMasked();
-            // Any finger movement = user is scrolling → block auto-follow
-            if (action == MotionEvent.ACTION_MOVE) {
-                userScrolled = true;
-                lastUserScrollTime = System.currentTimeMillis();
-            }
-            // Feed every event to the gesture detector so double-tap works
-            blockGd.onTouchEvent(event);
-            // Return false so the ScrollView still handles normal scrolling
-            return false;
-        });
     }
 
-    /**
-     * Find the index of the lyric TextView that contains the given y-coordinate
-     * in content space (scrolled coordinates, relative to llContainer).
-     */
-    private int findLyricViewAtY(int yInContent) {
-        int containerTop = llContainer.getTop();
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        handleBlockingModeTouch(event);
+        return super.dispatchTouchEvent(event);
+    }
+
+    private void handleBlockingModeTouch(MotionEvent event) {
+        if (lyricScrollMode != LYRIC_MODE_BLOCK || svLyrics == null || lyricLines.isEmpty()) {
+            return;
+        }
+
+        if (lyricsGestureDetector != null) {
+            lyricsGestureDetector.onTouchEvent(event);
+        }
+
+        float rawX = event.getRawX();
+        float rawY = event.getRawY();
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                touchStartedInLyricsView = isPointInsideView(rawX, rawY, svLyrics);
+                touchDownRawX = rawX;
+                touchDownRawY = rawY;
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (touchStartedInLyricsView) {
+                    float diffX = Math.abs(rawX - touchDownRawX);
+                    float diffY = Math.abs(rawY - touchDownRawY);
+                    if (diffY > touchSlop && diffY >= diffX) {
+                        userScrolled = true;
+                        lastUserScrollTime = System.currentTimeMillis();
+                    }
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                touchStartedInLyricsView = false;
+                break;
+            default:
+                break;
+        }
+    }
+
+    private boolean isPointInsideView(float rawX, float rawY, View view) {
+        if (view == null || view.getVisibility() != View.VISIBLE) {
+            return false;
+        }
+        int[] location = new int[2];
+        view.getLocationOnScreen(location);
+        return rawX >= location[0]
+                && rawX <= location[0] + view.getWidth()
+                && rawY >= location[1]
+                && rawY <= location[1] + view.getHeight();
+    }
+
+    private int findLyricViewAtRawY(float rawY) {
+        int nearestIndex = -1;
+        float nearestDistance = Float.MAX_VALUE;
+        int[] location = new int[2];
         for (int i = 0; i < lyricViews.size(); i++) {
             TextView tv = lyricViews.get(i);
-            int tvTop  = containerTop + tv.getTop();
-            int tvBottom = containerTop + tv.getBottom();
-            if (yInContent >= tvTop && yInContent <= tvBottom) {
+            tv.getLocationOnScreen(location);
+            float top = location[1];
+            float bottom = top + tv.getHeight();
+            if (rawY >= top && rawY <= bottom) {
                 return i;
             }
+            float center = top + tv.getHeight() / 2f;
+            float distance = Math.abs(rawY - center);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestIndex = i;
+            }
         }
-        return -1;
+        return nearestIndex;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        lyricsGestureDetector = null;
+        scrollHandler.removeCallbacksAndMessages(null);
     }
 
     private void loadLyrics(Song song) {
@@ -464,9 +510,4 @@ public class LyricsActivity extends AppCompatActivity {
         scrollHandler.removeCallbacksAndMessages(null);
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        scrollHandler.removeCallbacksAndMessages(null);
-    }
 }
