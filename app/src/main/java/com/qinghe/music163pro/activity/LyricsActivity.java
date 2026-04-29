@@ -67,8 +67,8 @@ public class LyricsActivity extends AppCompatActivity {
     // Blocking mode fields
     private int lyricScrollMode = LYRIC_MODE_FOLLOW;
     private int lyricResumeIntervalMs = 3000;
-    private volatile boolean userScrolled = false;
-    private volatile long lastUserScrollTime = 0L;
+    private boolean userScrolled = false;
+    private long lastUserScrollTime = 0L;
 
     private static class LyricLine {
         long timeMs;

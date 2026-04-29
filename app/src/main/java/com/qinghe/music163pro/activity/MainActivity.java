@@ -1503,6 +1503,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         overlayContainer.setBackgroundColor(0xFF1E1E1E);
+        // Let the overlay itself consume taps outside child views without blocking
+        // normal child dispatch; dispatchTouchEvent handles swipe/double-tap logic.
         overlayContainer.setClickable(true);
         overlayContainer.setFocusable(true);
         // Don't use addSwipeToDismiss - dispatchTouchEvent handles swipe gestures
