@@ -66,6 +66,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final int VOLUME_INDICATOR_TOP_MARGIN_DP = 10;
     private static final int VOLUME_INDICATOR_ANIM_DURATION_MS = 160;
     private static final float VOLUME_INDICATOR_INITIAL_SCALE = 0.96f;
+    private static final int LYRIC_MODE_FOLLOW = 0;
+    private static final int LYRIC_MODE_BLOCK = 1;
 
     private TextView tvSongName;
     private TextView tvArtist;
@@ -363,7 +365,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 lyricsTouchDownRawY = rawY;
                 break;
             case MotionEvent.ACTION_MOVE:
-                if (lyricScrollMode == 1 && lyricsTouchStartedInScrollView) {
+                if (lyricScrollMode == LYRIC_MODE_BLOCK && lyricsTouchStartedInScrollView) {
                     float diffX = Math.abs(rawX - lyricsTouchDownRawX);
                     float diffY = Math.abs(rawY - lyricsTouchDownRawY);
                     if (diffY > lyricsTouchSlop && diffY >= diffX) {
@@ -1464,7 +1466,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
 
         SharedPreferences lyricPrefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
-        lyricScrollMode = lyricPrefs.getInt("lyric_scroll_mode", 0);
+        lyricScrollMode = lyricPrefs.getInt("lyric_scroll_mode", LYRIC_MODE_FOLLOW);
         int intervalSec = lyricPrefs.getInt("lyric_resume_interval", 3);
         if (intervalSec < 1) intervalSec = 1;
         lyricResumeIntervalMs = intervalSec * 1000;
@@ -1479,7 +1481,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
             @Override
             public boolean onDoubleTap(MotionEvent e) {
-                if (lyricScrollMode != 1 || !isPointInsideView(e.getRawX(), e.getRawY(), lyricsScrollView)) {
+                if (lyricScrollMode != LYRIC_MODE_BLOCK
+                        || !isPointInsideView(e.getRawX(), e.getRawY(), lyricsScrollView)) {
                     return false;
                 }
                 int index = findOverlayLyricIndexAtRawY(e.getRawY());
@@ -1503,8 +1506,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         overlayContainer.setBackgroundColor(0xFF1E1E1E);
-        // Let the overlay itself consume taps outside child views without blocking
-        // normal child dispatch; dispatchTouchEvent handles swipe/double-tap logic.
+        // clickable/focusable makes the full-screen container consume taps that miss
+        // its children, while child views still receive their own touch dispatch.
+        // dispatchTouchEvent continues to observe the full event stream for gestures.
         overlayContainer.setClickable(true);
         overlayContainer.setFocusable(true);
         // Don't use addSwipeToDismiss - dispatchTouchEvent handles swipe gestures
@@ -1870,7 +1874,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
                     tvLyricsTime.setText(formatTime(currentPos) + " / " + formatTime(duration) + "  ← 右滑返回");
 
-                    if (lyricScrollMode == 1 && lyricsUserScrolled) {
+                    if (lyricScrollMode == LYRIC_MODE_BLOCK && lyricsUserScrolled) {
                         if (System.currentTimeMillis() - lyricsLastUserScrollTime >= lyricResumeIntervalMs) {
                             lyricsUserScrolled = false;
                         }
@@ -1896,7 +1900,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                             currentView.setTextColor(0xFFFFFFFF);
                             currentView.setTextSize(14);
 
-                            if (lyricScrollMode == 0 || !lyricsUserScrolled) {
+                            if (lyricScrollMode == LYRIC_MODE_FOLLOW || !lyricsUserScrolled) {
                                 scrollOverlayToLine(currentHighlightIndex);
                             }
                         }
