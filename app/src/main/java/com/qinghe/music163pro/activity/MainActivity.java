@@ -444,6 +444,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         });
     }
 
+    private void clearCurrentLyricHighlight() {
+        if (currentHighlightIndex >= 0 && currentHighlightIndex < lyricViews.size()) {
+            TextView currentView = lyricViews.get(currentHighlightIndex);
+            currentView.setTextColor(0xB3FFFFFF);
+            currentView.setTextSize(13);
+        }
+        currentHighlightIndex = -1;
+    }
+
     private void requestStoragePermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
         if (ContextCompat.checkSelfPermission(this,
@@ -1493,9 +1502,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 playerManager.seekTo(seekMs);
                 lyricsUserScrolled = false;
                 lyricsLastUserScrollTime = 0L;
-                currentHighlightIndex = -1;
+                clearCurrentLyricHighlight();
                 scrollOverlayToLine(index);
-                Toast.makeText(MainActivity.this, "跳转到: " + formatTime(seekMs), Toast.LENGTH_SHORT).show();
                 return true;
             }
         });
@@ -1890,10 +1898,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     }
 
                     if (newIndex != currentHighlightIndex && newIndex >= 0) {
-                        if (currentHighlightIndex >= 0 && currentHighlightIndex < lyricViews.size()) {
-                            lyricViews.get(currentHighlightIndex).setTextColor(0xB3FFFFFF);
-                            lyricViews.get(currentHighlightIndex).setTextSize(13);
-                        }
+                        clearCurrentLyricHighlight();
                         currentHighlightIndex = newIndex;
                         if (currentHighlightIndex < lyricViews.size()) {
                             TextView currentView = lyricViews.get(currentHighlightIndex);

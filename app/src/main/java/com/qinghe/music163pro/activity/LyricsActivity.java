@@ -144,11 +144,8 @@ public class LyricsActivity extends AppCompatActivity {
                         playerManager.seekTo(seekMs);
                         userScrolled = false;
                         lastUserScrollTime = 0L;
-                        currentHighlightIndex = -1;
+                        clearCurrentLyricHighlight();
                         scrollToLine(idx);
-                        Toast.makeText(LyricsActivity.this,
-                                "跳转到: " + formatTime(seekMs),
-                                Toast.LENGTH_SHORT).show();
                         return true;
                     }
                 });
@@ -437,10 +434,7 @@ public class LyricsActivity extends AppCompatActivity {
                     int newIndex = findCurrentLyricIndex(currentPos);
                     if (newIndex != currentHighlightIndex && newIndex >= 0) {
                         // Unhighlight previous
-                        if (currentHighlightIndex >= 0 && currentHighlightIndex < lyricViews.size()) {
-                            lyricViews.get(currentHighlightIndex).setTextColor(0xB3FFFFFF);
-                            lyricViews.get(currentHighlightIndex).setTextSize(13);
-                        }
+                        clearCurrentLyricHighlight();
                         // Highlight current
                         currentHighlightIndex = newIndex;
                         if (currentHighlightIndex < lyricViews.size()) {
@@ -483,6 +477,15 @@ public class LyricsActivity extends AppCompatActivity {
             int scrollTo = targetTop - (scrollViewHeight / 2) + (targetHeight / 2);
             svLyrics.smoothScrollTo(0, Math.max(0, scrollTo));
         });
+    }
+
+    private void clearCurrentLyricHighlight() {
+        if (currentHighlightIndex >= 0 && currentHighlightIndex < lyricViews.size()) {
+            TextView currentView = lyricViews.get(currentHighlightIndex);
+            currentView.setTextColor(0xB3FFFFFF);
+            currentView.setTextSize(13);
+        }
+        currentHighlightIndex = -1;
     }
 
     private String formatTime(int ms) {
