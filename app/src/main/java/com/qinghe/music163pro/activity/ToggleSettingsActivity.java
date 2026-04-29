@@ -1,8 +1,11 @@
 package com.qinghe.music163pro.activity;
 
+import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.WindowManager;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,13 +26,21 @@ public class ToggleSettingsActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "music163_settings";
     private static final String PREF_RECOGNITION_MODE = "song_recognition_mode";
+    private static final String PREF_LYRIC_SCROLL_MODE = "lyric_scroll_mode";
+    private static final String PREF_LYRIC_RESUME_INTERVAL = "lyric_resume_interval";
     private static final int MODE_MANUAL = 0;
     private static final int MODE_AUTO = 1;
+    // Lyric scroll modes: 0=每行 (follow current line), 1=阻塞 (blocked by user scroll)
+    private static final int LYRIC_MODE_FOLLOW = 0;
+    private static final int LYRIC_MODE_BLOCK = 1;
 
     private SwitchMaterial switchKeepScreenOn;
     private SwitchMaterial switchFavMode;
     private TextView tvSpeedModeValue;
     private TextView tvRecognitionModeValue;
+    private TextView tvLyricScrollModeValue;
+    private TextView tvLyricResumeIntervalValue;
+    private LinearLayout rowLyricResumeInterval;
     private SharedPreferences prefs;
 
     /** Suppress listener callbacks while programmatically setting switch state. */
@@ -51,8 +62,12 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         switchFavMode = findViewById(R.id.switch_fav_mode);
         tvSpeedModeValue = findViewById(R.id.tv_speed_mode_value);
         tvRecognitionModeValue = findViewById(R.id.tv_recognition_mode_value);
+        tvLyricScrollModeValue = findViewById(R.id.tv_lyric_scroll_mode_value);
+        tvLyricResumeIntervalValue = findViewById(R.id.tv_lyric_resume_interval_value);
         LinearLayout rowSpeedMode = findViewById(R.id.row_speed_mode);
         LinearLayout rowRecognitionMode = findViewById(R.id.row_recognition_mode);
+        LinearLayout rowLyricScrollMode = findViewById(R.id.row_lyric_scroll_mode);
+        rowLyricResumeInterval = findViewById(R.id.row_lyric_resume_interval);
 
         // Initialise switch states from prefs
         syncSwitchStates();
@@ -79,6 +94,8 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         // Speed mode: tap row to cycle through 3 values
         rowSpeedMode.setOnClickListener(v -> cycleSpeedMode());
         rowRecognitionMode.setOnClickListener(v -> cycleRecognitionMode());
+        rowLyricScrollMode.setOnClickListener(v -> cycleLyricScrollMode());
+        rowLyricResumeInterval.setOnClickListener(v -> editLyricResumeInterval());
     }
 
     @Override
@@ -94,6 +111,8 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         updatingSwitch = false;
         updateSpeedModeValue();
         updateRecognitionModeValue();
+        updateLyricScrollModeValue();
+        updateLyricResumeIntervalValue();
     }
 
     private void cycleSpeedMode() {
@@ -128,5 +147,58 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         int mode = prefs.getInt(PREF_RECOGNITION_MODE, MODE_AUTO);
         String[] labels = {"手动暂停", "自动识别"};
         tvRecognitionModeValue.setText(labels[mode]);
+    }
+
+    private void cycleLyricScrollMode() {
+        int current = prefs.getInt(PREF_LYRIC_SCROLL_MODE, LYRIC_MODE_FOLLOW);
+        int next = (current + 1) % 2;
+        prefs.edit().putInt(PREF_LYRIC_SCROLL_MODE, next).apply();
+        updateLyricScrollModeValue();
+        String[] labels = {"每行", "阻塞"};
+        Toast.makeText(this, "歌词滚动模式: " + labels[next], Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateLyricScrollModeValue() {
+        int mode = prefs.getInt(PREF_LYRIC_SCROLL_MODE, LYRIC_MODE_FOLLOW);
+        String[] labels = {"每行", "阻塞"};
+        tvLyricScrollModeValue.setText(labels[mode]);
+        // Only show resume interval row in 阻塞 mode
+        if (rowLyricResumeInterval != null) {
+            rowLyricResumeInterval.setVisibility(mode == LYRIC_MODE_BLOCK
+                    ? android.view.View.VISIBLE : android.view.View.GONE);
+        }
+    }
+
+    private void editLyricResumeInterval() {
+        int current = prefs.getInt(PREF_LYRIC_RESUME_INTERVAL, 3);
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(String.valueOf(current));
+        input.setSelectAllOnFocus(true);
+        int pad = (int) (8 * getResources().getDisplayMetrics().density);
+        input.setPadding(pad * 3, pad * 2, pad * 3, pad * 2);
+
+        new AlertDialog.Builder(this)
+                .setTitle("歌词恢复间隔（秒）")
+                .setView(input)
+                .setPositiveButton("确定", (dialog, which) -> {
+                    String val = input.getText().toString().trim();
+                    int seconds = 3;
+                    try {
+                        seconds = Integer.parseInt(val);
+                        if (seconds < 1) seconds = 1;
+                        if (seconds > 60) seconds = 60;
+                    } catch (NumberFormatException ignored) {}
+                    prefs.edit().putInt(PREF_LYRIC_RESUME_INTERVAL, seconds).apply();
+                    updateLyricResumeIntervalValue();
+                    Toast.makeText(this, "歌词恢复间隔: " + seconds + "秒", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void updateLyricResumeIntervalValue() {
+        int seconds = prefs.getInt(PREF_LYRIC_RESUME_INTERVAL, 3);
+        tvLyricResumeIntervalValue.setText(seconds + "秒无操作后恢复跟随");
     }
 }

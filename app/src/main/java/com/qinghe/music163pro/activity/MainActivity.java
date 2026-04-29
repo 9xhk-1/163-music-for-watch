@@ -22,6 +22,7 @@ import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -65,6 +66,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final int VOLUME_INDICATOR_TOP_MARGIN_DP = 10;
     private static final int VOLUME_INDICATOR_ANIM_DURATION_MS = 160;
     private static final float VOLUME_INDICATOR_INITIAL_SCALE = 0.96f;
+    private static final int LYRIC_MODE_FOLLOW = 0;
+    private static final int LYRIC_MODE_BLOCK = 1;
 
     private TextView tvSongName;
     private TextView tvArtist;
@@ -107,6 +110,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private LinearLayout lyricsContainer;
     private final Handler lyricsScrollHandler = new Handler();
     private Runnable lyricsScrollRunnable;
+    private GestureDetector lyricsGestureDetector;
+    private int lyricScrollMode = 0;
+    private int lyricResumeIntervalMs = 3000;
+    private boolean lyricsUserScrolled = false;
+    private long lyricsLastUserScrollTime = 0L;
+    private boolean lyricsTouchStartedInScrollView = false;
+    private float lyricsTouchDownRawX = 0f;
+    private float lyricsTouchDownRawY = 0f;
+    private int lyricsTouchSlop = 0;
     private TextView tvLyricsSongLabel;
     private TextView tvLyricsTimeRef;
     // Translation lyrics
@@ -284,6 +296,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Request storage permission for saving favorites to /sdcard/163Music/
         requestStoragePermission();
 
+        lyricsTouchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+
         // Check for updates once per day on first launch
         checkUpdateIfNeeded();
 
@@ -326,10 +340,117 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
+        handleLyricsOverlayTouch(event);
         if (activityGestureDetector != null) {
             activityGestureDetector.onTouchEvent(event);
         }
         return super.dispatchTouchEvent(event);
+    }
+
+    private void handleLyricsOverlayTouch(MotionEvent event) {
+        if (!lyricsOverlayShowing || lyricsScrollView == null || lyricLines.isEmpty()) {
+            return;
+        }
+
+        if (lyricsGestureDetector != null) {
+            lyricsGestureDetector.onTouchEvent(event);
+        }
+
+        float rawX = event.getRawX();
+        float rawY = event.getRawY();
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                lyricsTouchStartedInScrollView = isPointInsideView(rawX, rawY, lyricsScrollView);
+                lyricsTouchDownRawX = rawX;
+                lyricsTouchDownRawY = rawY;
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (lyricScrollMode == LYRIC_MODE_BLOCK && lyricsTouchStartedInScrollView) {
+                    float diffX = Math.abs(rawX - lyricsTouchDownRawX);
+                    float diffY = Math.abs(rawY - lyricsTouchDownRawY);
+                    if (diffY > lyricsTouchSlop && diffY >= diffX) {
+                        lyricsUserScrolled = true;
+                        lyricsLastUserScrollTime = System.currentTimeMillis();
+                    }
+                }
+                break;
+            case MotionEvent.ACTION_CANCEL:
+            case MotionEvent.ACTION_UP:
+                lyricsTouchStartedInScrollView = false;
+                break;
+            default:
+                break;
+        }
+    }
+
+    private boolean isPointInsideView(float rawX, float rawY, View view) {
+        if (view == null || view.getVisibility() != View.VISIBLE) {
+            return false;
+        }
+        int[] location = new int[2];
+        view.getLocationOnScreen(location);
+        return rawX >= location[0]
+                && rawX <= location[0] + view.getWidth()
+                && rawY >= location[1]
+                && rawY <= location[1] + view.getHeight();
+    }
+
+    private int findOverlayLyricIndexAtRawY(float rawY) {
+        if (lyricsContainer == null) {
+            return -1;
+        }
+        int nearestIndex = -1;
+        float nearestDistance = Float.MAX_VALUE;
+        int[] location = new int[2];
+        for (int i = 0; i < lyricsContainer.getChildCount() && i < lyricLines.size(); i++) {
+            View row = lyricsContainer.getChildAt(i);
+            if (row == null || row.getVisibility() != View.VISIBLE) {
+                continue;
+            }
+            row.getLocationOnScreen(location);
+            float top = location[1];
+            float bottom = top + row.getHeight();
+            if (rawY >= top && rawY <= bottom) {
+                return i;
+            }
+            float center = top + row.getHeight() / 2f;
+            float distance = Math.abs(rawY - center);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestIndex = i;
+            }
+        }
+        return nearestIndex;
+    }
+
+    private void scrollOverlayToLine(int index) {
+        if (lyricsScrollView == null || lyricsContainer == null
+                || index < 0 || index >= lyricsContainer.getChildCount()) {
+            return;
+        }
+        View row = lyricsContainer.getChildAt(index);
+        if (row == null) {
+            return;
+        }
+        row.post(() -> {
+            if (lyricsScrollView == null) {
+                return;
+            }
+            int scrollViewHeight = lyricsScrollView.getHeight();
+            int targetTop = row.getTop();
+            int targetHeight = row.getHeight();
+            int scrollTo = targetTop - (scrollViewHeight / 2) + (targetHeight / 2);
+            lyricsScrollView.smoothScrollTo(0, Math.max(0, scrollTo));
+        });
+    }
+
+    private void clearCurrentLyricHighlight() {
+        if (currentHighlightIndex >= 0 && currentHighlightIndex < lyricViews.size()) {
+            TextView currentView = lyricViews.get(currentHighlightIndex);
+            currentView.setTextColor(0xB3FFFFFF);
+            currentView.setTextSize(13);
+        }
+        currentHighlightIndex = -1;
     }
 
     private void requestStoragePermission() {
@@ -1353,14 +1474,51 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             return;
         }
 
+        SharedPreferences lyricPrefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        lyricScrollMode = lyricPrefs.getInt("lyric_scroll_mode", LYRIC_MODE_FOLLOW);
+        int intervalSec = lyricPrefs.getInt("lyric_resume_interval", 3);
+        if (intervalSec < 1) intervalSec = 1;
+        lyricResumeIntervalMs = intervalSec * 1000;
+        lyricsUserScrolled = false;
+        lyricsLastUserScrollTime = 0L;
+        lyricsTouchStartedInScrollView = false;
+        lyricsGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDown(MotionEvent e) {
+                return true;
+            }
+
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                if (lyricScrollMode != LYRIC_MODE_BLOCK
+                        || !isPointInsideView(e.getRawX(), e.getRawY(), lyricsScrollView)) {
+                    return false;
+                }
+                int index = findOverlayLyricIndexAtRawY(e.getRawY());
+                if (index < 0 || index >= lyricLines.size()) {
+                    return false;
+                }
+                int seekMs = (int) lyricLines.get(index).timeMs;
+                playerManager.seekTo(seekMs);
+                lyricsUserScrolled = false;
+                lyricsLastUserScrollTime = 0L;
+                clearCurrentLyricHighlight();
+                scrollOverlayToLine(index);
+                return true;
+            }
+        });
+
         FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
 
         overlayContainer = new FrameLayout(this);
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         overlayContainer.setBackgroundColor(0xFF1E1E1E);
-        // Consume all touch events to prevent underlying buttons from receiving clicks
-        overlayContainer.setOnTouchListener((v, event) -> true);
+        // clickable/focusable makes the full-screen container consume taps that miss
+        // its children, while child views still receive their own touch dispatch.
+        // dispatchTouchEvent continues to observe the full event stream for gestures.
+        overlayContainer.setClickable(true);
+        overlayContainer.setFocusable(true);
         // Don't use addSwipeToDismiss - dispatchTouchEvent handles swipe gestures
 
         LinearLayout mainLayout = new LinearLayout(this);
@@ -1724,6 +1882,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
                     tvLyricsTime.setText(formatTime(currentPos) + " / " + formatTime(duration) + "  ← 右滑返回");
 
+                    if (lyricScrollMode == LYRIC_MODE_BLOCK && lyricsUserScrolled) {
+                        if (System.currentTimeMillis() - lyricsLastUserScrollTime >= lyricResumeIntervalMs) {
+                            lyricsUserScrolled = false;
+                        }
+                    }
+
                     int newIndex = -1;
                     for (int i = 0; i < lyricLines.size(); i++) {
                         if (lyricLines.get(i).timeMs <= currentPos) {
@@ -1734,28 +1898,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     }
 
                     if (newIndex != currentHighlightIndex && newIndex >= 0) {
-                        if (currentHighlightIndex >= 0 && currentHighlightIndex < lyricViews.size()) {
-                            lyricViews.get(currentHighlightIndex).setTextColor(0xB3FFFFFF);
-                            lyricViews.get(currentHighlightIndex).setTextSize(13);
-                        }
+                        clearCurrentLyricHighlight();
                         currentHighlightIndex = newIndex;
                         if (currentHighlightIndex < lyricViews.size()) {
                             TextView currentView = lyricViews.get(currentHighlightIndex);
                             currentView.setTextColor(0xFFFFFFFF);
                             currentView.setTextSize(14);
 
-                            // Scroll to center the current line
-                            // The lyric TextView is inside a lineLayout container,
-                            // so use the parent container's position for scrolling
-                            currentView.post(() -> {
-                                if (lyricsScrollView == null) return;
-                                int scrollViewHeight = lyricsScrollView.getHeight();
-                                View parentLayout = (View) currentView.getParent();
-                                int targetTop = parentLayout != null ? parentLayout.getTop() : currentView.getTop();
-                                int targetHeight = parentLayout != null ? parentLayout.getHeight() : currentView.getHeight();
-                                int scrollTo = targetTop - (scrollViewHeight / 2) + (targetHeight / 2);
-                                lyricsScrollView.smoothScrollTo(0, Math.max(0, scrollTo));
-                            });
+                            if (lyricScrollMode == LYRIC_MODE_FOLLOW || !lyricsUserScrolled) {
+                                scrollOverlayToLine(currentHighlightIndex);
+                            }
                         }
                     }
                 }
@@ -1775,6 +1927,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         currentTlyricText = null;
         btnTranslationToggle = null;
         currentHighlightIndex = -1;
+        lyricsGestureDetector = null;
+        lyricsUserScrolled = false;
+        lyricsLastUserScrollTime = 0L;
+        lyricsTouchStartedInScrollView = false;
         lyricsScrollView = null;
         lyricsContainer = null;
         tvLyricsSongLabel = null;
