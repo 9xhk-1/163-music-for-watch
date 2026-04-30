@@ -81,7 +81,10 @@ public final class ImoowApiHelper {
                 JSONArray arr = resp.getJSONArray("data");
                 List<String> urls = new ArrayList<>();
                 for (int i = 0; i < arr.length(); i++) {
-                    urls.add(arr.optString(i));
+                    String downloadUrl = arr.optString(i, "").trim();
+                    if (!downloadUrl.isEmpty()) {
+                        urls.add(downloadUrl);
+                    }
                 }
                 MAIN_HANDLER.post(() -> callback.onResult(urls));
             } catch (Exception e) {
